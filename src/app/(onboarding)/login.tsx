@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/onboarding/BackButton';
@@ -17,16 +17,20 @@ function formatPhone(raw: string) {
 }
 
 export default function LoginScreen() {
-  const { draft, updateDraft } = useOnboarding();
+  const { draft, updateDraft, setAuthMode, submitPhone } = useOnboarding();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const phoneRef = useRef<TextInput>(null);
   const canContinue = draft.phoneNumber.replace(/\D/g, '').length >= 7;
 
   const onLogin = async () => {
+    setAuthMode('login');
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
+    const result = await submitPhone();
     setLoading(false);
-    router.push('/(onboarding)/verify-code');
+    if (result.ok) {
+      router.push('/(onboarding)/verify-code');
+    }
   };
 
   return (
@@ -43,8 +47,12 @@ export default function LoginScreen() {
           <Text style={styles.flag}>{draft.phoneCountry.flag}</Text>
           <Text style={styles.dial}>{draft.phoneCountry.dialCode}</Text>
         </Pressable>
-        <View style={styles.phoneBox}>
+        <Pressable
+          style={styles.phoneBox}
+          onPress={() => phoneRef.current?.focus()}
+          accessibilityRole="none">
           <TextInput
+            ref={phoneRef}
             value={draft.phoneNumber}
             onChangeText={(text) => updateDraft({ phoneNumber: formatPhone(text) })}
             placeholder="Enter your phone"
@@ -52,10 +60,15 @@ export default function LoginScreen() {
             keyboardType="phone-pad"
             style={styles.phoneInput}
           />
-        </View>
+        </Pressable>
       </View>
 
-      <Pressable onPress={() => router.push('/(onboarding)/phone')} style={styles.linkWrap}>
+      <Pressable
+        onPress={() => {
+          setAuthMode('signup');
+          router.push('/(onboarding)/phone');
+        }}
+        style={styles.linkWrap}>
         <Text style={styles.link}>New here? Create account</Text>
       </Pressable>
 
@@ -106,16 +119,20 @@ const styles = StyleSheet.create({
   },
   phoneBox: {
     flex: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: OnboardingColors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 56,
   },
   phoneInput: {
+    flex: 1,
+    alignSelf: 'stretch',
     color: OnboardingColors.text,
     fontSize: 16,
     padding: 0,
+    margin: 0,
   },
   linkWrap: {
     marginTop: 18,

@@ -1,22 +1,29 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { NotificationContentPrefs } from '@/components/engagement/NotificationContentPrefs';
 import { BackButton } from '@/components/onboarding/BackButton';
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell';
 import { PrimaryButton } from '@/components/onboarding/PrimaryButton';
 import { OnboardingColors } from '@/constants/onboarding';
 import { useOnboarding } from '@/context/onboarding-context';
+import { usePreferences } from '@/context/preferences-context';
 
 export default function NotificationsScreen() {
   const { updateDraft } = useOnboarding();
+  const { setNotificationPermission } = usePreferences();
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   const enable = () => {
     updateDraft({ notificationsEnabled: true });
+    setNotificationPermission('granted');
     router.push('/(onboarding)/country');
   };
 
   const skip = () => {
     updateDraft({ notificationsEnabled: false });
+    setNotificationPermission('denied');
     router.push('/(onboarding)/country');
   };
 
@@ -25,6 +32,11 @@ export default function NotificationsScreen() {
       footer={
         <>
           <PrimaryButton label="Enable push notifications" onPress={enable} />
+          <PrimaryButton
+            label={customizeOpen ? 'Hide content options' : 'Choose alert contents'}
+            variant="secondary"
+            onPress={() => setCustomizeOpen((open) => !open)}
+          />
           <PrimaryButton label="Not now" variant="secondary" onPress={skip} />
         </>
       }>
@@ -37,20 +49,27 @@ export default function NotificationsScreen() {
         </View>
         <Text style={styles.title}>STAY AHEAD{'\n'}OF CHARGES</Text>
         <Text style={styles.copy}>
-          Customize local push alerts for renewals, trial endings, and unused subscriptions
+          Customize local push alerts for renewals, trial endings, and unused subscriptions. If you
+          skip, you can still allow them later from Settings.
         </Text>
       </View>
+
+      {customizeOpen ? (
+        <View style={styles.prefs}>
+          <NotificationContentPrefs />
+        </View>
+      ) : null}
     </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
   center: {
-    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 40,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
   iconCard: {
     width: 88,
@@ -92,5 +111,9 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 16,
     maxWidth: 300,
+  },
+  prefs: {
+    marginTop: 8,
+    marginBottom: 12,
   },
 });

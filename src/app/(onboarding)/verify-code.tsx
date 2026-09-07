@@ -10,7 +10,7 @@ import { OnboardingColors } from '@/constants/onboarding';
 import { useOnboarding } from '@/context/onboarding-context';
 
 export default function VerifyCodeScreen() {
-  const { draft, verifyCode, resendCode } = useOnboarding();
+  const { draft, authMode, verifyCode, resendCode, completeOnboarding } = useOnboarding();
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(15);
   const [errorOpen, setErrorOpen] = useState(false);
@@ -30,7 +30,12 @@ export default function VerifyCodeScreen() {
       const result = await verifyCode(code);
       if (cancelled) return;
       if (result.ok) {
-        router.push('/(onboarding)/notifications');
+        if (authMode === 'login') {
+          await completeOnboarding();
+          router.replace('/(tabs)/home');
+        } else {
+          router.push('/(onboarding)/notifications');
+        }
       } else {
         setErrorOpen(true);
       }
@@ -38,7 +43,7 @@ export default function VerifyCodeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [code, verifyCode]);
+  }, [code, verifyCode, authMode, completeOnboarding]);
 
   const onResend = async () => {
     if (seconds > 0) return;
@@ -50,9 +55,11 @@ export default function VerifyCodeScreen() {
   return (
     <OnboardingShell>
       <BackButton />
-      <Text style={styles.title}>6-digit code</Text>
+      <Text style={styles.title}>{authMode === 'login' ? 'Welcome back' : '6-digit code'}</Text>
       <Text style={styles.subtitle}>
-        Enter the code sent to {draft.phoneCountry.dialCode} ···· {masked}
+        {authMode === 'login'
+          ? `Enter the code we sent to ${draft.phoneCountry.dialCode} ···· ${masked}`
+          : `Enter the code sent to ${draft.phoneCountry.dialCode} ···· ${masked}`}
       </Text>
 
       <OtpInput value={code} onChange={setCode} />

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BackButton } from '@/components/onboarding/BackButton';
@@ -18,15 +18,17 @@ function formatPhone(raw: string) {
 }
 
 export default function PhoneScreen() {
-  const { draft, updateDraft, submitPhone } = useOnboarding();
+  const { draft, updateDraft, setAuthMode, submitPhone } = useOnboarding();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const phoneRef = useRef<TextInput>(null);
 
   const digits = draft.phoneNumber.replace(/\D/g, '');
   const canContinue = digits.length >= 7;
 
   const onCreate = async () => {
+    setAuthMode('signup');
     setLoading(true);
     const result = await submitPhone();
     setLoading(false);
@@ -54,8 +56,12 @@ export default function PhoneScreen() {
           <Text style={styles.flag}>{draft.phoneCountry.flag}</Text>
           <Text style={styles.dial}>{draft.phoneCountry.dialCode}</Text>
         </Pressable>
-        <View style={styles.phoneBox}>
+        <Pressable
+          style={styles.phoneBox}
+          onPress={() => phoneRef.current?.focus()}
+          accessibilityRole="none">
           <TextInput
+            ref={phoneRef}
             value={draft.phoneNumber}
             onChangeText={(text) => updateDraft({ phoneNumber: formatPhone(text) })}
             placeholder="Enter your phone"
@@ -68,10 +74,15 @@ export default function PhoneScreen() {
               <Text style={styles.clear}>✕</Text>
             </Pressable>
           ) : null}
-        </View>
+        </Pressable>
       </View>
 
-      <Pressable onPress={() => router.push('/(onboarding)/login')} style={styles.loginLink}>
+      <Pressable
+        onPress={() => {
+          setAuthMode('login');
+          router.push('/(onboarding)/login');
+        }}
+        style={styles.loginLink}>
         <Text style={styles.loginText}>
           Already have an account? <Text style={styles.loginAccent}>Log in</Text>
         </Text>
@@ -144,9 +155,11 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
+    alignSelf: 'stretch',
     color: OnboardingColors.text,
     fontSize: 16,
     padding: 0,
+    margin: 0,
   },
   clear: {
     color: OnboardingColors.textMuted,

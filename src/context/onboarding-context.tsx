@@ -1,7 +1,9 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import type { Country } from '@/constants/onboarding';
 import { COUNTRIES } from '@/constants/onboarding';
+
+export type AuthMode = 'signup' | 'login';
 
 export type OnboardingDraft = {
   phoneCountry: Country;
@@ -17,6 +19,8 @@ export type OnboardingDraft = {
 };
 
 type OnboardingContextValue = {
+  authMode: AuthMode;
+  setAuthMode: (mode: AuthMode) => void;
   draft: OnboardingDraft;
   updateDraft: (patch: Partial<OnboardingDraft>) => void;
   resetDraft: () => void;
@@ -46,13 +50,25 @@ async function fakeDelay(ms = 600) {
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
+  const [authMode, setAuthMode] = useState<AuthMode>('signup');
   const [draft, setDraft] = useState<OnboardingDraft>(defaultDraft);
+
+  const updateDraft = useCallback((patch: Partial<OnboardingDraft>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const resetDraft = useCallback(() => {
+    setDraft(defaultDraft);
+    setAuthMode('signup');
+  }, []);
 
   const value = useMemo<OnboardingContextValue>(
     () => ({
+      authMode,
+      setAuthMode,
       draft,
-      updateDraft: (patch) => setDraft((prev) => ({ ...prev, ...patch })),
-      resetDraft: () => setDraft(defaultDraft),
+      updateDraft,
+      resetDraft,
       submitPhone: async () => {
         await fakeDelay();
         if (draft.phoneNumber.replace(/\D/g, '').length < 7) {
@@ -76,7 +92,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       },
     }),
-    [draft]
+    [authMode, draft, updateDraft, resetDraft]
   );
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;

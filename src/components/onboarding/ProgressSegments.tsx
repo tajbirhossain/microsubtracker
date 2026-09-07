@@ -5,15 +5,26 @@ import { OnboardingColors } from '@/constants/onboarding';
 type Props = {
   count: number;
   activeIndex: number;
+  theme?: 'dark' | 'light';
 };
 
-export function ProgressSegments({ count, activeIndex }: Props) {
+export function ProgressSegments({ count, activeIndex, theme = 'dark' }: Props) {
+  const isLight = theme === 'light';
   return (
     <View style={styles.row}>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          style={[styles.segment, i === activeIndex ? styles.active : styles.inactive]}
+          style={[
+            styles.segment,
+            i === activeIndex
+              ? isLight
+                ? styles.activeLight
+                : styles.active
+              : isLight
+                ? styles.inactiveLight
+                : styles.inactive,
+          ]}
         />
       ))}
     </View>
@@ -48,6 +59,12 @@ const styles = StyleSheet.create({
   },
   inactive: {
     backgroundColor: OnboardingColors.progressInactive,
+  },
+  activeLight: {
+    backgroundColor: '#111111',
+  },
+  inactiveLight: {
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   skip: {
     color: OnboardingColors.link,

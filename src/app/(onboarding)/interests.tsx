@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { InterestPill } from '@/components/onboarding/InterestPill';
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell';
 import { PrimaryButton } from '@/components/onboarding/PrimaryButton';
-import { BRAND_NAME, INTEREST_SECTIONS, OnboardingColors } from '@/constants/onboarding';
+import { INTEREST_SECTIONS, OnboardingColors } from '@/constants/onboarding';
 import { useOnboarding } from '@/context/onboarding-context';
 
 export default function InterestsScreen() {
@@ -27,8 +27,10 @@ export default function InterestsScreen() {
           onPress={() => router.push('/(onboarding)/profile')}
         />
       }>
-      <Text style={styles.title}>What do you want to use {BRAND_NAME} for?</Text>
-      <Text style={styles.subtitle}>Pick what matters most — we&apos;ll tailor your dashboard around it</Text>
+      <Text style={styles.title}>What do you want help with?</Text>
+      <Text style={styles.subtitle}>
+        Pick the goals that matter — we&apos;ll shape your setup around them
+      </Text>
 
       {INTEREST_SECTIONS.map((section) => (
         <View key={section.id} style={styles.section}>

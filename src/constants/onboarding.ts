@@ -37,21 +37,21 @@ export type WelcomeSlide = {
 export const WELCOME_SLIDES: WelcomeSlide[] = [
   {
     id: 'control',
-    headline: 'READY TO TAKE CONTROL OF YOUR SUBSCRIPTIONS?',
+    headline: 'READY TO STOP LOSING MONEY TO SUBSCRIPTIONS?',
     theme: 'dark',
     visual: 'control',
   },
   {
     id: 'track',
-    headline: 'SEE YOUR BURN RATE AT A GLANCE',
-    subtitle: 'Track micro and macro spend on a clear dashboard — monthly, yearly, overall.',
+    headline: 'SEE WHERE YOUR MONEY ACTUALLY GOES',
+    subtitle: 'One clear monthly total — so small charges stop sneaking past you.',
     theme: 'light',
     visual: 'track',
   },
   {
     id: 'remind',
-    headline: 'CANCEL BEFORE YOU GET CHARGED',
-    subtitle: 'Trial countdowns, ghost-sub alerts, and one-tap cancel guides when it matters.',
+    headline: 'GET WARNED BEFORE YOU GET CHARGED',
+    subtitle: 'We\'ll nudge you before trials end and renewals hit — in time to cancel.',
     theme: 'dark',
     visual: 'remind',
   },
@@ -101,39 +101,35 @@ export type InterestSection = {
 
 export const INTEREST_SECTIONS: InterestSection[] = [
   {
-    id: 'tracking',
-    title: 'Tracking & overview',
+    id: 'goals',
+    title: 'What do you want help with?',
     options: [
-      { id: 'rapid-add', label: 'Rapid add', icon: '⚡' },
-      { id: 'burn-rate', label: 'Burn rate dashboard', icon: '🔥' },
-      { id: 'categories', label: 'Micro / macro categories', icon: '🗂️' },
-      { id: 'calendar', label: 'Timeline & calendar', icon: '📅' },
-      { id: 'currency', label: 'Currency conversion', icon: '💱' },
+      { id: 'monthly-spend', label: 'Know my monthly spend', icon: '💸' },
+      { id: 'surprise-charges', label: 'Stop surprise charges', icon: '🛡️' },
+      { id: 'cut-costs', label: 'Cut what I don\'t use', icon: '✂️' },
+      { id: 'upcoming-bills', label: 'See what\'s renewing soon', icon: '📅' },
+      { id: 'family-share', label: 'Keep family plans tidy', icon: '👨‍👩‍👧' },
     ],
   },
   {
-    id: 'actions',
-    title: 'Alerts & actions',
+    id: 'pain',
+    title: 'What usually catches you out?',
     options: [
-      { id: 'trials', label: 'Trial expiry countdowns', icon: '⏳' },
-      { id: 'ghost', label: 'Unused / ghost alerts', icon: '👻' },
-      { id: 'cancel-guide', label: 'One-tap cancel guides', icon: '🚪' },
-      { id: 'push', label: 'Custom push reminders', icon: '🔔' },
-      { id: 'sms-parse', label: 'SMS / notification parse', icon: '💬' },
+      { id: 'forgotten-trials', label: 'Forgotten free trials', icon: '⏳' },
+      { id: 'unused-subs', label: 'Apps I forgot I\'m paying for', icon: '🫥' },
+      { id: 'hard-to-cancel', label: 'Hard-to-cancel services', icon: '🚪' },
+      { id: 'renewal-reminders', label: 'Missing renewal dates', icon: '🔔' },
+      { id: 'foreign-charges', label: 'Charges in other currencies', icon: '🌍' },
     ],
   },
 ];
 
-export type PlanPerk = {
+export type PlanBenefit = {
   id: string;
   icon: string;
-  label: string;
-};
-
-export type PlanFeature = {
+  perkLabel: string;
   title: string;
   description: string;
-  icon: string;
 };
 
 export type PlanTier = {
@@ -143,8 +139,7 @@ export type PlanTier = {
   tagline: string;
   badge?: string;
   accent: readonly [string, string];
-  perks: PlanPerk[];
-  features: PlanFeature[];
+  benefits: PlanBenefit[];
   cta: string;
   billingNote: string;
 };
@@ -153,76 +148,83 @@ export const PLANS: PlanTier[] = [
   {
     id: 'plus',
     name: 'Plus',
-    priceLabel: '7 days free then $4.99/month',
-    tagline: 'Burn rate, categories, and reminders that keep you ahead',
+    priceLabel: '$2.49/month',
+    tagline: 'Clarity and reminders so renewals never catch you off guard',
     badge: 'Popular',
     accent: ['#1B3A6B', '#0A1528'],
-    perks: [
-      { id: 'burn', icon: '🔥', label: 'Burn rate\ndashboard' },
-      { id: 'categories', icon: '🗂️', label: 'Micro /\nmacro cats' },
-      { id: 'calendar', icon: '📅', label: 'Timeline &\ncalendar' },
-      { id: 'trials', icon: '⏳', label: 'Trial\ncountdowns' },
-      { id: 'push', icon: '🔔', label: 'Custom\nreminders' },
-    ],
-    features: [
+    benefits: [
       {
-        title: 'Burn rate dashboard',
-        description: 'See monthly and yearly spend hierarchy in one view',
-        icon: '🔥',
+        id: 'spend',
+        icon: '💸',
+        perkLabel: 'Know your\nmonthly total',
+        title: 'Know your real monthly spend',
+        description: 'One clear total across every plan — no spreadsheet needed',
       },
       {
-        title: 'Micro & macro categories',
-        description: 'Organize every plan the way you actually think about spend',
-        icon: '🗂️',
+        id: 'upcoming',
+        icon: '📅',
+        perkLabel: 'See what\'s\ncoming up',
+        title: 'See renewals before they hit',
+        description: 'A simple view of what\'s charging soon, so you can decide in time',
       },
       {
-        title: 'Trial expiry cards',
-        description: 'Countdowns so free trials never quietly convert',
+        id: 'trials',
         icon: '⏳',
+        perkLabel: 'Trial end\nwarnings',
+        title: 'Never sleep through a free trial',
+        description:
+          'Friendly warnings before a trial turns into a paid plan, plus a direct link to that service\'s cancel page',
+      },
+      {
+        id: 'reminders',
+        icon: '🔔',
+        perkLabel: 'Renewal\nnudges',
+        title: 'Get a heads-up before you\'re charged',
+        description: 'A push like “Netflix renews tomorrow — $15.49” so you can act first',
       },
     ],
-    cta: 'Start free trial',
-    billingNote:
-      '7-day free trial, then $4.99/month. Cancel anytime before the trial ends.',
+    cta: 'Get Plus',
+    billingNote: '$2.49/month. Cancel anytime.',
   },
   {
     id: 'pro',
     name: 'Pro',
-    priceLabel: '7 days free then $9.99/month',
-    tagline: 'Rapid add, cancel guides, and ghost-sub detection',
+    priceLabel: '$4.99/month',
+    tagline: 'Extra help to find waste, cancel faster, and stay in control',
     badge: 'Best value',
     accent: ['#3D2A6B', '#12081F'],
-    perks: [
-      { id: 'rapid-add', icon: '⚡', label: 'Rapid add\n+ autofill' },
-      { id: 'sms', icon: '💬', label: 'SMS /\nparse flow' },
-      { id: 'cancel', icon: '🚪', label: 'Cancel\nguide' },
-      { id: 'ghost', icon: '👻', label: 'Ghost sub\nalerts' },
-      { id: 'currency', icon: '💱', label: 'Currency\nselector' },
-    ],
-    features: [
+    benefits: [
       {
-        title: 'Rapid add with auto-fill',
-        description: 'Add subscriptions in seconds with smart suggested details',
+        id: 'fast-add',
         icon: '⚡',
+        perkLabel: 'Add plans\nin seconds',
+        title: 'Add a plan in seconds',
+        description: 'Start typing a name and we\'ll fill in the rest for you',
       },
       {
-        title: 'One-tap cancellation guides',
-        description: 'Open a clear cancel path when a renewal is close',
+        id: 'forgot',
+        icon: '🫥',
+        perkLabel: 'Find forgotten\nsubscriptions',
+        title: 'Find what you forgot you\'re paying for',
+        description: 'Quiet plans you haven\'t touched still cost money — we\'ll surface them',
+      },
+      {
+        id: 'cancel',
         icon: '🚪',
+        perkLabel: 'Easier\ncancel steps',
+        title: 'Clear steps when you\'re ready to cancel',
+        description:
+          'When a renewal is close, open a simple path to cancel without hunting around',
       },
       {
-        title: 'Unused / ghost alerts',
-        description: 'Catch plans you forgot about before they charge again',
-        icon: '👻',
-      },
-      {
-        title: 'SMS & notification parser consent',
-        description: 'Opt in to detect subscriptions from messages when you want help',
-        icon: '💬',
+        id: 'currency',
+        icon: '🌍',
+        perkLabel: 'See spend\nin your currency',
+        title: 'Understand foreign charges',
+        description: 'See overseas plans in the currency you actually think in',
       },
     ],
-    cta: 'Start free trial',
-    billingNote:
-      '7-day free trial, then $9.99/month. Cancel anytime before the trial ends.',
+    cta: 'Get Pro',
+    billingNote: '$4.99/month. Cancel anytime.',
   },
 ];

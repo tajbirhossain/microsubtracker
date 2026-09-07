@@ -62,23 +62,23 @@ export function PaywallHeroCard({ plan }: HeroProps) {
 
 type PerksProps = {
   planName: string;
-  perks: PlanTier['perks'];
+  benefits: PlanTier['benefits'];
 };
 
-export function PaywallPerksRow({ planName, perks }: PerksProps) {
+export function PaywallPerksRow({ planName, benefits }: PerksProps) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>Included with {planName}</Text>
+      <Text style={styles.sectionLabel}>Why people get {planName}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.perksRow}>
-        {perks.map((perk) => (
-          <View key={perk.id} style={styles.perkItem}>
+        {benefits.map((benefit) => (
+          <View key={benefit.id} style={styles.perkItem}>
             <View style={styles.perkCircle}>
-              <Text style={styles.perkIcon}>{perk.icon}</Text>
+              <Text style={styles.perkIcon}>{benefit.icon}</Text>
             </View>
-            <Text style={styles.perkLabel}>{perk.label}</Text>
+            <Text style={styles.perkLabel}>{benefit.perkLabel}</Text>
           </View>
         ))}
       </ScrollView>
@@ -87,21 +87,21 @@ export function PaywallPerksRow({ planName, perks }: PerksProps) {
 }
 
 type FeaturesProps = {
-  features: PlanTier['features'];
+  benefits: PlanTier['benefits'];
 };
 
-export function PaywallFeatureList({ features }: FeaturesProps) {
+export function PaywallFeatureList({ benefits }: FeaturesProps) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>Top features</Text>
-      {features.map((feature) => (
-        <View key={feature.title} style={styles.featureCard}>
+      <Text style={styles.sectionLabel}>What this helps with</Text>
+      {benefits.map((benefit) => (
+        <View key={benefit.id} style={styles.featureCard}>
           <View style={styles.featureIconWrap}>
-            <Text style={styles.featureIcon}>{feature.icon}</Text>
+            <Text style={styles.featureIcon}>{benefit.icon}</Text>
           </View>
           <View style={styles.featureCopy}>
-            <Text style={styles.featureTitle}>{feature.title}</Text>
-            <Text style={styles.featureDesc}>{feature.description}</Text>
+            <Text style={styles.featureTitle}>{benefit.title}</Text>
+            <Text style={styles.featureDesc}>{benefit.description}</Text>
           </View>
         </View>
       ))}

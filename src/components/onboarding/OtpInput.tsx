@@ -28,33 +28,52 @@ export function OtpInput({ value, onChange, length = 6, autoFocus = true }: Prop
     return () => clearTimeout(t);
   }, [autoFocus]);
 
-  const setDigit = (index: number, char: string) => {
-    const next = digits.slice();
-    const cleaned = char.replace(/\D/g, '');
-
-    if (cleaned.length > 1) {
-      const pasted = cleaned.slice(0, length).split('');
-      for (let i = 0; i < length; i++) {
-        next[i] = pasted[i] ?? '';
-      }
-      onChange(next.join(''));
+  const applyPaste = (cleaned: string) => {
+    const pasted = cleaned.slice(0, length);
+    onChange(pasted);
+    const focusAt = Math.min(Math.max(pasted.length - 1, 0), length - 1);
+    if (pasted.length >= length) {
+      refs.current[focusAt]?.blur();
+    } else {
       refs.current[Math.min(pasted.length, length - 1)]?.focus();
+    }
+  };
+
+  const applySingle = (index: number, digit: string) => {
+    if (!digit) {
+      onChange(value.slice(0, index));
       return;
     }
 
-    next[index] = cleaned.slice(-1);
-    onChange(next.join(''));
+    const next = (value.slice(0, index) + digit + value.slice(index + 1)).slice(0, length);
+    onChange(next);
 
-    if (cleaned && index < length - 1) {
+    if (index < length - 1) {
       refs.current[index + 1]?.focus();
+    } else {
+      refs.current[index]?.blur();
     }
+  };
+
+  const setDigit = (index: number, text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+
+    if (cleaned.length > 1) {
+      // Full-code paste/autofill. A 2-char "old+new" in a filled box is not a paste.
+      if (cleaned.length >= length || value.length === 0 || index === 0) {
+        applyPaste(cleaned);
+        return;
+      }
+      applySingle(index, cleaned.slice(-1));
+      return;
+    }
+
+    applySingle(index, cleaned);
   };
 
   const onKeyPress = (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
     if (e.nativeEvent.key === 'Backspace' && !digits[index] && index > 0) {
-      const next = digits.slice();
-      next[index - 1] = '';
-      onChange(next.join(''));
+      onChange(value.slice(0, index - 1));
       refs.current[index - 1]?.focus();
     }
   };
@@ -73,17 +92,35 @@ export function OtpInput({ value, onChange, length = 6, autoFocus = true }: Prop
               onChangeText={(text) => setDigit(i, text)}
               onKeyPress={(e) => onKeyPress(i, e)}
               keyboardType="number-pad"
-              textContentType={i === 0 ? 'oneTimeCode' : 'none'}
-              autoComplete={i === 0 ? 'sms-otp' : 'off'}
-              maxLength={length}
+              textContentType="none"
+              autoComplete="off"
+              maxLength={1}
+              caretHidden
               selectTextOnFocus
-              importantForAutofill={i === 0 ? 'yes' : 'no'}
-              style={[styles.box, (value.length === i || (value.length === length && i === length - 1)) && styles.boxActive]}
+              importantForAutofill="no"
+              style={[
+                styles.box,
+                (value.length === i || (value.length === length && i === length - 1)) &&
+                  styles.boxActive,
+              ]}
               selectionColor={OnboardingColors.link}
             />
           </Fragment>
         ))}
       </View>
+      <TextInput
+        value=""
+        onChangeText={(text) => {
+          const cleaned = text.replace(/\D/g, '');
+          if (cleaned.length > 1) applyPaste(cleaned);
+        }}
+        textContentType="oneTimeCode"
+        autoComplete="sms-otp"
+        keyboardType="number-pad"
+        style={styles.hiddenAutofill}
+        caretHidden
+        importantForAutofill="yes"
+      />
     </View>
   );
 }
@@ -118,5 +155,11 @@ const styles = StyleSheet.create({
     color: OnboardingColors.text,
     fontSize: 20,
     marginHorizontal: 2,
+  },
+  hiddenAutofill: {
+    position: 'absolute',
+    opacity: 0,
+    height: 1,
+    width: 1,
   },
 });

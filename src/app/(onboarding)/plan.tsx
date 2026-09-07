@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell';
 import {
@@ -44,38 +44,23 @@ export default function PlanScreen() {
           </Text>
         </>
       }>
-      <View style={styles.topRow}>
-        <Text style={styles.title}>Select plan</Text>
-        <Pressable onPress={finish} hitSlop={10}>
-          <Text style={styles.notNow}>Not now</Text>
-        </Pressable>
-      </View>
+      <Text style={styles.title}>Select plan</Text>
 
       <PlanSwitcher plans={PLANS} selectedId={plan.id} onSelect={onSelectPlan} />
 
       <PaywallHeroCard plan={plan} />
-      <PaywallPerksRow planName={plan.name} perks={plan.perks} />
-      <PaywallFeatureList features={plan.features} />
+      <PaywallPerksRow planName={plan.name} benefits={plan.benefits} />
+      <PaywallFeatureList benefits={plan.benefits} />
     </OnboardingShell>
   );
 }
 
 const styles = StyleSheet.create({
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
   title: {
     color: OnboardingColors.text,
     fontSize: 32,
     fontWeight: '700',
-  },
-  notNow: {
-    color: OnboardingColors.link,
-    fontSize: 16,
-    fontWeight: '500',
+    marginTop: 12,
   },
   legal: {
     color: OnboardingColors.textMuted,

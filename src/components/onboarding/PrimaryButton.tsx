@@ -6,6 +6,7 @@ import {
   View,
   type PressableProps,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
@@ -16,6 +17,7 @@ type Props = PressableProps & {
   loading?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost';
   style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 };
 
 export function PrimaryButton({
@@ -24,6 +26,7 @@ export function PrimaryButton({
   disabled,
   variant = 'primary',
   style,
+  labelStyle,
   onPress,
   ...rest
 }: Props) {
@@ -71,6 +74,7 @@ export function PrimaryButton({
               isSecondary && styles.secondaryLabel,
               variant === 'ghost' && styles.ghostLabel,
               isDisabled && isPrimary && styles.primaryDisabledLabel,
+              labelStyle,
             ]}>
             {label}
           </Text>
