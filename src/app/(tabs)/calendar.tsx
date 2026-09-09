@@ -10,7 +10,7 @@ import { DashboardColors } from '@/constants/dashboard';
 import { BottomTabInset } from '@/constants/theme';
 import { usePreferences } from '@/context/preferences-context';
 import { useSubscriptions } from '@/context/subscriptions-context';
-import { toDateKey, toMonthlyAmount } from '@/utils/subscriptions';
+import { toMonthlyAmount } from '@/utils/subscriptions';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
@@ -18,7 +18,7 @@ export default function CalendarScreen() {
   const { formatInCurrency } = usePreferences();
   const now = new Date();
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
-  const [selectedDate, setSelectedDate] = useState<string | null>(toDateKey(now));
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const monthSubs = useMemo(() => {
     return activeSubscriptions.filter((sub) => {
@@ -89,7 +89,9 @@ export default function CalendarScreen() {
           month={cursor.month}
           subscriptions={activeSubscriptions}
           selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
+          onSelectDate={(dateKey) =>
+            setSelectedDate((prev) => (prev === dateKey ? null : dateKey))
+          }
           onPrevMonth={() => shiftMonth(-1)}
           onNextMonth={() => shiftMonth(1)}
         />

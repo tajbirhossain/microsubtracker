@@ -115,7 +115,7 @@ export function OtpInput({ value, onChange, length = 6, autoFocus = true }: Prop
           if (cleaned.length > 1) applyPaste(cleaned);
         }}
         textContentType="oneTimeCode"
-        autoComplete="sms-otp"
+        autoComplete="one-time-code"
         keyboardType="number-pad"
         style={styles.hiddenAutofill}
         caretHidden

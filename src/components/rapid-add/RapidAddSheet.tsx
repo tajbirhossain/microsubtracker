@@ -10,12 +10,20 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ServiceLogo } from '@/components/ServiceLogo';
 import { DashboardColors, type BillingCycle } from '@/constants/dashboard';
 import { searchCatalog, type CatalogService } from '@/constants/service-catalog';
-import { formatMoney } from '@/utils/subscriptions';
+import type { DraftSubscription } from '@/context/subscriptions-context';
+import {
+  formatMoney,
+  formatShortDate,
+  nextBillingFromStart,
+  parseDateKey,
+  toDateKey,
+} from '@/utils/subscriptions';
 
 type Props = {
   visible: boolean;
@@ -23,25 +31,8 @@ type Props = {
   onAdded: (name: string) => void;
   onRequestParser: () => void;
   existingNames: string[];
-  addFromCatalog: (
-    service: CatalogService,
-    overrides?: {
-      amount?: number;
-      billingCycle?: BillingCycle;
-      isTrial?: boolean;
-      trialEndsInDays?: number;
-    }
-  ) => void;
-  addCustom: (draft: {
-    name: string;
-    amount: number;
-    billingCycle: BillingCycle;
-    category: string;
-    color: string;
-    icon: string;
-    isTrial?: boolean;
-    trialEndsInDays?: number;
-  }) => void;
+  addFromCatalog: (service: CatalogService, overrides?: Partial<DraftSubscription>) => void;
+  addCustom: (draft: DraftSubscription) => void;
 };
 
 const CYCLES: BillingCycle[] = ['monthly', 'yearly', 'weekly'];
@@ -63,6 +54,9 @@ export function RapidAddSheet({
   const [customMode, setCustomMode] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
   const [trialDaysText, setTrialDaysText] = useState('7');
+  const [startMode, setStartMode] = useState<'today' | 'custom'>('today');
+  const [startDate, setStartDate] = useState(() => toDateKey(new Date()));
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -73,6 +67,9 @@ export function RapidAddSheet({
       setCustomMode(false);
       setIsTrial(false);
       setTrialDaysText('7');
+      setStartMode('today');
+      setStartDate(toDateKey(new Date()));
+      setShowDatePicker(false);
     }
   }, [visible]);
 
@@ -89,6 +86,9 @@ export function RapidAddSheet({
     setCustomMode(false);
   };
 
+  const resolvedStartDate = startMode === 'today' ? toDateKey(new Date()) : startDate;
+  const previewNextBilling = isTrial ? null : nextBillingFromStart(cycle, resolvedStartDate);
+
   const trialDays = Number.parseInt(trialDaysText, 10);
   const trialValid = !isTrial || (trialDays > 0 && !Number.isNaN(trialDays));
   const canSave =
@@ -97,15 +97,34 @@ export function RapidAddSheet({
     !Number.isNaN(Number.parseFloat(amountText)) &&
     trialValid;
 
+  const onPickDate = (_event: unknown, date?: Date) => {
+    if (!date) return;
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    setStartDate(toDateKey(date));
+  };
+
+  const onDismissPicker = () => {
+    setShowDatePicker(false);
+  };
+
   const save = () => {
     if (!canSave) return;
     const amount = Number.parseFloat(amountText);
-    const trialFields = isTrial
-      ? { isTrial: true as const, trialEndsInDays: trialDays }
-      : { isTrial: false as const, trialEndsInDays: undefined };
+    const startFields = {
+      startDate: resolvedStartDate,
+      ...(isTrial
+        ? { isTrial: true as const, trialEndsInDays: trialDays }
+        : {
+            isTrial: false as const,
+            trialEndsInDays: undefined,
+            nextBillingDate: nextBillingFromStart(cycle, resolvedStartDate),
+          }),
+    };
 
     if (selected && selected.name.toLowerCase() === query.trim().toLowerCase()) {
-      addFromCatalog(selected, { amount, billingCycle: cycle, ...trialFields });
+      addFromCatalog(selected, { amount, billingCycle: cycle, ...startFields });
       onAdded(selected.name);
     } else {
       addCustom({
@@ -115,7 +134,7 @@ export function RapidAddSheet({
         category: 'Productivity',
         color: '#5B9EFF',
         icon: query.trim().slice(0, 1).toUpperCase(),
-        ...trialFields,
+        ...startFields,
       });
       onAdded(query.trim());
     }
@@ -196,7 +215,9 @@ export function RapidAddSheet({
                 {suggestions.length === 0 ? (
                   <View style={styles.emptySuggest}>
                     <Text style={styles.emptyTitle}>No matches</Text>
-                    <Text style={styles.emptyBody}>Keep typing — you can still save a custom plan below.</Text>
+                    <Text style={styles.emptyBody}>
+                      Keep typing — you can still save a custom plan below.
+                    </Text>
                   </View>
                 ) : (
                   suggestions.map((service) => (
@@ -276,6 +297,56 @@ export function RapidAddSheet({
                   })}
                 </View>
 
+                <Text style={styles.fieldLabel}>Started</Text>
+                <View style={styles.cycleRow}>
+                  <Pressable
+                    onPress={() => {
+                      setStartMode('today');
+                      setShowDatePicker(false);
+                      setStartDate(toDateKey(new Date()));
+                    }}
+                    style={[styles.cycleChip, startMode === 'today' && styles.cycleChipActive]}>
+                    <Text style={[styles.cycleText, startMode === 'today' && styles.cycleTextActive]}>
+                      Today
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setStartMode('custom');
+                      setShowDatePicker(true);
+                    }}
+                    style={[styles.cycleChip, startMode === 'custom' && styles.cycleChipActive]}>
+                    <Text
+                      style={[styles.cycleText, startMode === 'custom' && styles.cycleTextActive]}>
+                      {startMode === 'custom' ? formatShortDate(startDate) : 'Another date'}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {startMode === 'custom' && showDatePicker ? (
+                  <View style={styles.pickerWrap}>
+                    <DateTimePicker
+                      value={parseDateKey(startDate)}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onValueChange={onPickDate}
+                      onDismiss={onDismissPicker}
+                      themeVariant="dark"
+                    />
+                    {Platform.OS === 'ios' ? (
+                      <Pressable onPress={() => setShowDatePicker(false)} style={styles.pickerDone}>
+                        <Text style={styles.pickerDoneText}>Done</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {!isTrial && previewNextBilling ? (
+                  <Text style={styles.nextHint}>
+                    Next charge {formatShortDate(previewNextBilling)}
+                  </Text>
+                ) : null}
+
                 <Pressable
                   onPress={() => setIsTrial((prev) => !prev)}
                   style={[styles.trialToggle, isTrial && styles.trialToggleOn]}>
@@ -293,7 +364,9 @@ export function RapidAddSheet({
                     <Text style={styles.fieldLabel}>Trial period (days left)</Text>
                     <TextInput
                       value={trialDaysText}
-                      onChangeText={(text) => setTrialDaysText(text.replace(/[^\d]/g, '').slice(0, 3))}
+                      onChangeText={(text) =>
+                        setTrialDaysText(text.replace(/[^\d]/g, '').slice(0, 3))
+                      }
                       keyboardType="number-pad"
                       placeholder="7"
                       placeholderTextColor={DashboardColors.textMuted}
@@ -612,6 +685,32 @@ const styles = StyleSheet.create({
   },
   cycleTextActive: {
     color: DashboardColors.accent,
+  },
+  pickerWrap: {
+    backgroundColor: DashboardColors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  pickerDone: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: DashboardColors.border,
+  },
+  pickerDoneText: {
+    color: DashboardColors.accent,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  nextHint: {
+    color: DashboardColors.textMuted,
+    fontSize: 12,
+    marginTop: -2,
   },
   trialToggle: {
     marginTop: 4,

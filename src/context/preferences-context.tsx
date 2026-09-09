@@ -12,12 +12,19 @@ import {
   convertUsd,
   getCurrency,
   type CurrencyCode,
+  isCurrencyCode,
 } from '@/constants/currency';
 import {
   DEFAULT_NOTIFICATION_CONTENT_IDS,
   type NotificationContentId,
 } from '@/constants/notification-content';
 import { useNetwork } from '@/context/network-context';
+import { useOnboarding } from '@/context/onboarding-context';
+import {
+  getCurrencyRates,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+} from '@/services/api';
 import { formatMoney } from '@/utils/subscriptions';
 
 export type RatesStatus = 'live' | 'cached';
@@ -40,10 +47,27 @@ type PreferencesContextValue = {
   formatInCurrency: (amountUsd: number, compact?: boolean) => string;
 };
 
+function prefsToContentIds(prefs: {
+  renewalsEnabled: boolean;
+  trialsEnabled: boolean;
+  unusedEnabled: boolean;
+  weeklySummaryEnabled: boolean;
+  upcomingWeekEnabled: boolean;
+}): NotificationContentId[] {
+  const ids: NotificationContentId[] = [];
+  if (prefs.renewalsEnabled) ids.push('renewals');
+  if (prefs.trialsEnabled) ids.push('trials');
+  if (prefs.unusedEnabled) ids.push('unused');
+  if (prefs.weeklySummaryEnabled) ids.push('weekly-summary');
+  if (prefs.upcomingWeekEnabled) ids.push('upcoming-week');
+  return ids.length ? ids : DEFAULT_NOTIFICATION_CONTENT_IDS;
+}
+
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const { isOnline } = useNetwork();
+  const { isAuthenticated, isAuthReady, user } = useOnboarding();
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>('USD');
   const [ratesStatus, setRatesStatus] = useState<RatesStatus>('live');
   const [manualCached, setManualCached] = useState(false);
@@ -53,6 +77,35 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     DEFAULT_NOTIFICATION_CONTENT_IDS
   );
   const [dismissedGhostIds, setDismissedGhostIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user?.preferredCurrency && isCurrencyCode(user.preferredCurrency)) {
+      setCurrencyCode(user.preferredCurrency);
+    }
+  }, [user?.preferredCurrency]);
+
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated || !isOnline) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [prefs, rates] = await Promise.all([
+          getNotificationPreferences(),
+          getCurrencyRates('USD'),
+        ]);
+        if (cancelled) return;
+        setNotificationContentIds(prefsToContentIds(prefs));
+        setRatesStatus(rates.stale || rates.fallback ? 'cached' : 'live');
+      } catch {
+        if (!cancelled) setRatesStatus('cached');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthReady, isAuthenticated, isOnline]);
 
   useEffect(() => {
     if (!isOnline) {
@@ -73,19 +126,52 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     setRatesStatus(status);
   }, []);
 
-  const toggleNotificationContent = useCallback((id: NotificationContentId) => {
-    setNotificationContentIds((prev) => {
-      if (prev.includes(id)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((item) => item !== id);
+  const persistNotificationIds = useCallback(
+    async (ids: NotificationContentId[]) => {
+      if (!isAuthenticated || !isOnline) return;
+      try {
+        await updateNotificationPreferences({
+          renewalsEnabled: ids.includes('renewals'),
+          trialsEnabled: ids.includes('trials'),
+          unusedEnabled: ids.includes('unused'),
+          weeklySummaryEnabled: ids.includes('weekly-summary'),
+          upcomingWeekEnabled: ids.includes('upcoming-week'),
+        });
+      } catch (error) {
+        console.warn('Failed to sync notification preferences', error);
       }
-      return [...prev, id];
-    });
-  }, []);
+    },
+    [isAuthenticated, isOnline]
+  );
+
+  const toggleNotificationContent = useCallback(
+    (id: NotificationContentId) => {
+      setNotificationContentIds((prev) => {
+        let next: NotificationContentId[];
+        if (prev.includes(id)) {
+          if (prev.length === 1) return prev;
+          next = prev.filter((item) => item !== id);
+        } else {
+          next = [...prev, id];
+        }
+        void persistNotificationIds(next);
+        return next;
+      });
+    },
+    [persistNotificationIds]
+  );
+
+  const setNotificationContentIdsSafe = useCallback(
+    (ids: NotificationContentId[]) => {
+      setNotificationContentIds(ids);
+      void persistNotificationIds(ids);
+    },
+    [persistNotificationIds]
+  );
 
   const seedDefaultNotificationContent = useCallback(() => {
-    setNotificationContentIds(DEFAULT_NOTIFICATION_CONTENT_IDS);
-  }, []);
+    setNotificationContentIdsSafe(DEFAULT_NOTIFICATION_CONTENT_IDS);
+  }, [setNotificationContentIdsSafe]);
 
   const dismissGhost = useCallback((subscriptionId: string) => {
     setDismissedGhostIds((prev) =>
@@ -114,7 +200,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setNotificationPermission,
       notificationContentIds,
       toggleNotificationContent,
-      setNotificationContentIds,
+      setNotificationContentIds: setNotificationContentIdsSafe,
       seedDefaultNotificationContent,
       dismissedGhostIds,
       dismissGhost,
@@ -129,6 +215,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       notificationPermission,
       notificationContentIds,
       toggleNotificationContent,
+      setNotificationContentIdsSafe,
       seedDefaultNotificationContent,
       dismissedGhostIds,
       dismissGhost,

@@ -10,12 +10,12 @@ import { OnboardingColors } from '@/constants/onboarding';
 import { useOnboarding } from '@/context/onboarding-context';
 
 export default function VerifyCodeScreen() {
-  const { draft, authMode, verifyCode, resendCode, completeOnboarding } = useOnboarding();
+  const { draft, authMode, verifyCode, resendCode, completeOnboarding, lastOtpHint } =
+    useOnboarding();
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(15);
   const [errorOpen, setErrorOpen] = useState(false);
-
-  const masked = draft.phoneNumber.replace(/\D/g, '').slice(-4) || '····';
+  const [errorMessage, setErrorMessage] = useState('Please check the code and try again');
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -37,6 +37,7 @@ export default function VerifyCodeScreen() {
           router.push('/(onboarding)/notifications');
         }
       } else {
+        setErrorMessage(result.error ?? 'Please check the code and try again');
         setErrorOpen(true);
       }
     })();
@@ -57,10 +58,9 @@ export default function VerifyCodeScreen() {
       <BackButton />
       <Text style={styles.title}>{authMode === 'login' ? 'Welcome back' : '6-digit code'}</Text>
       <Text style={styles.subtitle}>
-        {authMode === 'login'
-          ? `Enter the code we sent to ${draft.phoneCountry.dialCode} ···· ${masked}`
-          : `Enter the code sent to ${draft.phoneCountry.dialCode} ···· ${masked}`}
+        Enter the code we sent to {draft.email.trim().toLowerCase() || 'your email'}
       </Text>
+      {lastOtpHint ? <Text style={styles.devHint}>Dev OTP: {lastOtpHint}</Text> : null}
 
       <OtpInput value={code} onChange={setCode} />
 
@@ -75,7 +75,7 @@ export default function VerifyCodeScreen() {
       <ErrorSheet
         visible={errorOpen}
         title="Incorrect code entered"
-        message="Please check the code and try again"
+        message={errorMessage}
         onDismiss={() => {
           setErrorOpen(false);
           setCode('');
@@ -96,6 +96,11 @@ const styles = StyleSheet.create({
     color: OnboardingColors.textSecondary,
     fontSize: 16,
     marginTop: 8,
+  },
+  devHint: {
+    color: OnboardingColors.link,
+    fontSize: 14,
+    marginTop: 10,
   },
   timer: {
     color: OnboardingColors.text,

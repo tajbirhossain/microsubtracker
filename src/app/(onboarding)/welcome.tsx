@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Dimensions,
@@ -234,7 +234,7 @@ export default function WelcomeScreen() {
           accessibilityRole="button"
           onPress={() => {
             setAuthMode('signup');
-            router.push('/(onboarding)/phone');
+            router.push('/(onboarding)/register' as Href);
           }}
           style={[styles.cta, createBtnStyle]}>
           <Animated.Text style={[styles.ctaLabel, createLabelStyle]}>Create account</Animated.Text>

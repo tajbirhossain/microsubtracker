@@ -44,6 +44,10 @@ const RATES_FROM_USD: Record<CurrencyCode, number> = {
 
 export const CACHED_RATES_UPDATED_AT = '2026-09-05T18:00:00.000Z';
 
+export function isCurrencyCode(code: string): code is CurrencyCode {
+  return CURRENCIES.some((c) => c.code === code);
+}
+
 export function getCurrency(code: string): CurrencyOption {
   return CURRENCIES.find((c) => c.code === code) ?? CURRENCIES[0];
 }

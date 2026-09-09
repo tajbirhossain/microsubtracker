@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { CurrencySelector } from '@/components/engagement/CurrencySelector';
@@ -6,6 +7,7 @@ import { NotificationPermissionCard } from '@/components/engagement/Notification
 import { StatePanel } from '@/components/ui/StatePanel';
 import { formatCachedRateLabel } from '@/constants/currency';
 import { DashboardColors } from '@/constants/dashboard';
+import { useOnboarding } from '@/context/onboarding-context';
 import { usePreferences } from '@/context/preferences-context';
 import { useSubscriptions } from '@/context/subscriptions-context';
 
@@ -17,10 +19,29 @@ type Props = {
 export function PreferencesForm({ monthlyTotalUsd, showDemoData = true }: Props) {
   const { ratesStatus, currencyCode } = usePreferences();
   const { activeSubscriptions, clearDemoData, loadDemoData } = useSubscriptions();
+  const { user, signOut, isAuthenticated } = useOnboarding();
   const hasSubs = activeSubscriptions.length > 0;
 
   return (
     <View style={styles.wrap}>
+      {isAuthenticated && user ? (
+        <>
+          <Text style={styles.sectionLabel}>Account</Text>
+          <Text style={styles.sectionHint}>{user.email}</Text>
+          <StatePanel
+            title="Signed in"
+            body="Sign out to switch accounts. Your subscription data stays on the server."
+            ctaLabel="Sign out"
+            onCtaPress={() => {
+              void (async () => {
+                await signOut();
+                router.replace('/(onboarding)/welcome');
+              })();
+            }}
+          />
+        </>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Display currency</Text>
       <Text style={styles.sectionHint}>
         Convert your burn rate into the currency you think in. Active: {currencyCode}.

@@ -41,6 +41,8 @@ export type Subscription = {
   isTrial?: boolean;
   trialEndsInDays?: number;
   unusedDays?: number;
+  /** Optimistic concurrency version from the API */
+  version?: number;
 };
 
 export const SUBSCRIPTION_CATEGORIES = [

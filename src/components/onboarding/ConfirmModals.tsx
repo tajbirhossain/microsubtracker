@@ -3,28 +3,61 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { OnboardingColors } from '@/constants/onboarding';
 import { PrimaryButton } from '@/components/onboarding/PrimaryButton';
 
-type ConfirmProps = {
+type ConfirmEmailProps = {
   visible: boolean;
-  phoneDisplay: string;
-  flag: string;
+  email: string;
+  otpHint?: string;
   onConfirm: () => void;
   onGoBack: () => void;
 };
 
-export function ConfirmPhoneModal({ visible, phoneDisplay, flag, onConfirm, onGoBack }: ConfirmProps) {
+export function ConfirmEmailModal({
+  visible,
+  email,
+  otpHint,
+  onConfirm,
+  onGoBack,
+}: ConfirmEmailProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onGoBack}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.phone}>
-            {flag} {phoneDisplay}
+          <Text style={styles.phone}>{email}</Text>
+          <Text style={styles.copy}>
+            Is this email correct? We&apos;ll send a confirmation code there.
           </Text>
-          <Text style={styles.copy}>Is this number correct? We&apos;ll send you a confirmation code there.</Text>
+          {otpHint ? (
+            <Text style={styles.devHint}>Dev OTP: {otpHint}</Text>
+          ) : null}
           <PrimaryButton label="Confirm" onPress={onConfirm} style={styles.btn} />
           <PrimaryButton label="Go back" variant="secondary" onPress={onGoBack} />
         </View>
       </View>
     </Modal>
+  );
+}
+
+/** @deprecated Use ConfirmEmailModal — kept temporarily for any leftover imports */
+export function ConfirmPhoneModal({
+  visible,
+  phoneDisplay,
+  flag,
+  onConfirm,
+  onGoBack,
+}: {
+  visible: boolean;
+  phoneDisplay: string;
+  flag: string;
+  onConfirm: () => void;
+  onGoBack: () => void;
+}) {
+  return (
+    <ConfirmEmailModal
+      visible={visible}
+      email={`${flag} ${phoneDisplay}`}
+      onConfirm={onConfirm}
+      onGoBack={onGoBack}
+    />
   );
 }
 
@@ -76,6 +109,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 8,
+  },
+  devHint: {
+    color: OnboardingColors.link,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 4,
   },
   btn: {
     marginTop: 4,

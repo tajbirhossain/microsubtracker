@@ -51,19 +51,32 @@ export function sumYearly(subs: Subscription[]): number {
 }
 
 export function parseDateKey(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number);
+  const key = normalizeDateKey(iso);
+  if (!key) return new Date(NaN);
+  const [year, month, day] = key.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 
+/** Accepts YYYY-MM-DD or full ISO datetimes from the API. */
+export function normalizeDateKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
+  return match?.[1] ?? null;
+}
+
 export function formatShortDate(iso: string): string {
-  return parseDateKey(iso).toLocaleDateString('en-US', {
+  const date = parseDateKey(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   });
 }
 
 export function formatWeekday(iso: string): string {
-  return parseDateKey(iso).toLocaleDateString('en-US', { weekday: 'short' });
+  const date = parseDateKey(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
 export function daysUntil(iso: string, from = new Date()): number {
@@ -94,6 +107,63 @@ export function toDateKey(date: Date): string {
   const m = `${date.getMonth() + 1}`.padStart(2, '0');
   const d = `${date.getDate()}`.padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+/** Advance one billing period from a local calendar date. */
+export function addOneBillingCycle(from: Date, cycle: BillingCycle): Date {
+  const date = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  switch (cycle) {
+    case 'weekly':
+      date.setDate(date.getDate() + 7);
+      break;
+    case 'yearly':
+      date.setFullYear(date.getFullYear() + 1);
+      break;
+    case 'monthly':
+    default: {
+      const day = date.getDate();
+      date.setMonth(date.getMonth() + 1, 1);
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+      date.setDate(Math.min(day, lastDay));
+      break;
+    }
+  }
+  return date;
+}
+
+/** Next renewal from today (or `from`) based on billing cycle — not a fixed +28 days. */
+export function defaultNextBillingDate(cycle: BillingCycle, from = new Date()): string {
+  return toDateKey(addOneBillingCycle(from, cycle));
+}
+
+/**
+ * Derive next_billing_date from a subscription start date.
+ * Future start → first charge on that day. Today/past → roll forward by cycle until after today.
+ * Uses existing next_billing_date field only — no new schema column.
+ */
+export function nextBillingFromStart(
+  cycle: BillingCycle,
+  startDateKey: string,
+  today = new Date()
+): string {
+  const start = parseDateKey(startDateKey);
+  if (Number.isNaN(start.getTime())) {
+    return defaultNextBillingDate(cycle, today);
+  }
+
+  const todayKey = toDateKey(today);
+  const startKey = toDateKey(start);
+  if (startKey > todayKey) {
+    return startKey;
+  }
+
+  let next = addOneBillingCycle(start, cycle);
+  let guard = 0;
+  while (toDateKey(next) <= todayKey && guard < 600) {
+    next = addOneBillingCycle(next, cycle);
+    guard += 1;
+  }
+  return toDateKey(next);
 }
 
 export function groupByBillingDate(subs: Subscription[]): { date: string; items: Subscription[] }[] {

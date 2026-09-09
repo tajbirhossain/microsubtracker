@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { DashboardColors, type Subscription } from '@/constants/dashboard';
 import { usePreferences } from '@/context/preferences-context';
-import { formatShortDate, formatWeekday, groupByBillingDate, toMonthlyAmount } from '@/utils/subscriptions';
+import { cycleLabel, formatShortDate, formatWeekday, groupByBillingDate } from '@/utils/subscriptions';
 
 type Props = {
   subscriptions: Subscription[];
@@ -25,10 +25,8 @@ export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming char
   return (
     <View style={styles.list}>
       {groups.map(({ date, items }) => {
-        const dayTotal = items.reduce(
-          (sum, item) => sum + toMonthlyAmount(item.amount, item.billingCycle),
-          0
-        );
+        // Calendar day totals are what actually charges that day — not monthlyized burn.
+        const dayTotal = items.reduce((sum, item) => sum + item.amount, 0);
 
         return (
           <View key={date} style={styles.group}>
@@ -52,7 +50,10 @@ export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming char
                   <Text style={styles.itemName} numberOfLines={1}>
                     {item.name}
                   </Text>
-                  <Text style={styles.itemAmount}>{formatInCurrency(item.amount)}</Text>
+                  <Text style={styles.itemAmount}>
+                    {formatInCurrency(item.amount)}
+                    {cycleLabel(item.billingCycle)}
+                  </Text>
                 </View>
               ))}
             </View>
