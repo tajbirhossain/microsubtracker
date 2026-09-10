@@ -21,12 +21,12 @@ function statusCopy(status: NotificationPermissionStatus) {
     case 'denied':
       return {
         title: 'Notifications blocked',
-        body: 'Alerts stay off until you allow them in system Settings. Local content prefs still apply once permission returns.',
+        body: 'Alerts stay off until you allow them in system Settings.',
       };
     default:
       return {
         title: 'Push alerts not set',
-        body: 'Enable local pushes for renewals and trial endings, or leave them off and track from the dashboard.',
+        body: 'Enable alerts for renewals and trial endings, or leave them off and track from the dashboard.',
       };
   }
 }
@@ -49,30 +49,30 @@ export function NotificationPermissionCard({ compact = false }: Props) {
         tone={notificationPermission === 'denied' ? 'warning' : 'neutral'}
         title={copy.title}
         body={copy.body}
-        ctaLabel={notificationPermission === 'denied' ? 'Open Settings' : undefined}
-        onCtaPress={notificationPermission === 'denied' ? openSettings : undefined}
-        secondaryLabel={
+        ctaLabel={
           notificationPermission === 'denied'
-            ? 'Simulate allow (demo)'
-            : notificationPermission === 'granted'
-              ? 'Simulate deny (demo)'
-              : 'Enable for this device'
+            ? 'Open Settings'
+            : notificationPermission === 'unknown'
+              ? 'Enable alerts'
+              : undefined
         }
-        onSecondaryPress={() => {
-          if (notificationPermission === 'denied') {
-            setNotificationPermission('granted');
-            return;
-          }
-          if (notificationPermission === 'granted') {
-            setNotificationPermission('denied');
-            return;
-          }
-          setNotificationPermission('granted');
-        }}
+        onCtaPress={
+          notificationPermission === 'denied'
+            ? openSettings
+            : notificationPermission === 'unknown'
+              ? () => setNotificationPermission('granted')
+              : undefined
+        }
+        secondaryLabel={notificationPermission === 'unknown' ? 'Not now' : undefined}
+        onSecondaryPress={
+          notificationPermission === 'unknown'
+            ? () => setNotificationPermission('denied')
+            : undefined
+        }
       />
-      {notificationPermission === 'unknown' ? (
-        <Text style={styles.skipHint} onPress={() => setNotificationPermission('denied')}>
-          Keep alerts off
+      {notificationPermission === 'granted' ? (
+        <Text style={styles.skipHint} onPress={openSettings}>
+          Manage in system Settings
         </Text>
       ) : null}
     </View>

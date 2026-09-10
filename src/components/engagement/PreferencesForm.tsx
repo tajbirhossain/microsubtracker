@@ -9,18 +9,14 @@ import { formatCachedRateLabel } from '@/constants/currency';
 import { DashboardColors } from '@/constants/dashboard';
 import { useOnboarding } from '@/context/onboarding-context';
 import { usePreferences } from '@/context/preferences-context';
-import { useSubscriptions } from '@/context/subscriptions-context';
 
 type Props = {
   monthlyTotalUsd: number;
-  showDemoData?: boolean;
 };
 
-export function PreferencesForm({ monthlyTotalUsd, showDemoData = true }: Props) {
+export function PreferencesForm({ monthlyTotalUsd }: Props) {
   const { ratesStatus, currencyCode } = usePreferences();
-  const { activeSubscriptions, clearDemoData, loadDemoData } = useSubscriptions();
   const { user, signOut, isAuthenticated } = useOnboarding();
-  const hasSubs = activeSubscriptions.length > 0;
 
   return (
     <View style={styles.wrap}>
@@ -50,9 +46,10 @@ export function PreferencesForm({ monthlyTotalUsd, showDemoData = true }: Props)
 
       {ratesStatus === 'cached' ? (
         <View style={styles.cacheBanner}>
-          <Text style={styles.cacheTitle}>Cached conversion rates</Text>
+          <Text style={styles.cacheTitle}>Using saved rates</Text>
           <Text style={styles.cacheBody}>
-            Live FX unavailable — showing last saved rates from {formatCachedRateLabel()}.
+            Live FX is temporarily unavailable. Showing last saved rates from{' '}
+            {formatCachedRateLabel()}.
           </Text>
         </View>
       ) : null}
@@ -65,31 +62,6 @@ export function PreferencesForm({ monthlyTotalUsd, showDemoData = true }: Props)
 
       <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Notification content</Text>
       <NotificationContentPrefs />
-
-      {showDemoData ? (
-        <>
-          <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Demo data</Text>
-          <Text style={styles.sectionHint}>
-            Clear the seeded list to preview the empty dashboard, or restore the sample plans.
-          </Text>
-          <StatePanel
-            title={hasSubs ? 'Sample subscriptions loaded' : 'No subscriptions stored'}
-            body={
-              hasSubs
-                ? 'Clearing keeps offline edits local — useful for testing empty and loading states.'
-                : 'Load the recruiter demo set to restore burn rate, trials, and ghost alerts.'
-            }
-            ctaLabel={hasSubs ? 'Clear demo data' : 'Load demo data'}
-            onCtaPress={() => {
-              if (hasSubs) {
-                void clearDemoData();
-                return;
-              }
-              void loadDemoData();
-            }}
-          />
-        </>
-      ) : null}
     </View>
   );
 }

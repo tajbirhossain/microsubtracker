@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { DashboardColors, type Subscription } from '@/constants/dashboard';
 import { usePreferences } from '@/context/preferences-context';
-import { cycleLabel, formatShortDate, formatWeekday, groupByBillingDate } from '@/utils/subscriptions';
+import { cycleLabel, formatShortDate, formatWeekday, groupByBillingDate, subscriptionAmountUsd } from '@/utils/subscriptions';
 
 type Props = {
   subscriptions: Subscription[];
@@ -10,7 +10,7 @@ type Props = {
 };
 
 export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming charges' }: Props) {
-  const { formatInCurrency } = usePreferences();
+  const { formatFromCurrency, rates } = usePreferences();
   const groups = groupByBillingDate(subscriptions);
 
   if (groups.length === 0) {
@@ -26,7 +26,10 @@ export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming char
     <View style={styles.list}>
       {groups.map(({ date, items }) => {
         // Calendar day totals are what actually charges that day — not monthlyized burn.
-        const dayTotal = items.reduce((sum, item) => sum + item.amount, 0);
+        const dayTotalUsd = items.reduce(
+          (sum, item) => sum + subscriptionAmountUsd(item, rates),
+          0
+        );
 
         return (
           <View key={date} style={styles.group}>
@@ -41,7 +44,7 @@ export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming char
                   <Text style={styles.dateLabel}>{formatShortDate(date)}</Text>
                   <Text style={styles.weekday}>{formatWeekday(date)}</Text>
                 </View>
-                <Text style={styles.dayTotal}>{formatInCurrency(dayTotal)}</Text>
+                <Text style={styles.dayTotal}>{formatFromCurrency(dayTotalUsd, 'USD')}</Text>
               </View>
 
               {items.map((item) => (
@@ -51,7 +54,7 @@ export function UpcomingTimeline({ subscriptions, emptyLabel = 'No upcoming char
                     {item.name}
                   </Text>
                   <Text style={styles.itemAmount}>
-                    {formatInCurrency(item.amount)}
+                    {formatFromCurrency(item.amount, item.currency)}
                     {cycleLabel(item.billingCycle)}
                   </Text>
                 </View>

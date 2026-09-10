@@ -4,7 +4,6 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import {
   CURRENCIES,
   formatCachedRateLabel,
-  getRateFromUsd,
   type CurrencyCode,
 } from '@/constants/currency';
 import { DashboardColors } from '@/constants/dashboard';
@@ -21,10 +20,13 @@ export function CurrencySelector({ monthlyTotalUsd, compact = false, onCompactPr
     currencyCode,
     setCurrency,
     ratesStatus,
-    setRatesStatus,
+    ratesFetchedAt,
+    getUsdRate,
+    refreshRates,
     formatInCurrency,
   } = usePreferences();
   const [query, setQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -37,6 +39,15 @@ export function CurrencySelector({ monthlyTotalUsd, compact = false, onCompactPr
     );
   }, [query]);
 
+  const onRetry = async () => {
+    setRefreshing(true);
+    try {
+      await refreshRates();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (compact) {
     return (
       <Pressable onPress={onCompactPress} style={styles.compactChip} hitSlop={6}>
@@ -46,29 +57,31 @@ export function CurrencySelector({ monthlyTotalUsd, compact = false, onCompactPr
     );
   }
 
+  const rate = getUsdRate(currencyCode);
+
   return (
     <View style={styles.wrap}>
       <View style={styles.previewCard}>
         <Text style={styles.previewLabel}>Monthly total in {currencyCode}</Text>
         <Text style={styles.previewAmount}>{formatInCurrency(monthlyTotalUsd)}</Text>
         <Text style={styles.previewMeta}>
-          1 USD = {getRateFromUsd(currencyCode).toLocaleString('en-US', { maximumFractionDigits: 4 })}{' '}
-          {currencyCode}
+          1 USD = {rate.toLocaleString('en-US', { maximumFractionDigits: 4 })} {currencyCode}
         </Text>
         {ratesStatus === 'cached' ? (
-          <Text style={styles.cachedNote}>
-            Live FX unavailable — using cached rate · updated {formatCachedRateLabel()}
+          <>
+            <Text style={styles.cachedNote}>
+              Live FX unavailable — using saved rates · updated{' '}
+              {formatCachedRateLabel(ratesFetchedAt)}
+            </Text>
+            <Pressable onPress={() => void onRetry()} hitSlop={6} disabled={refreshing}>
+              <Text style={styles.retryLink}>{refreshing ? 'Refreshing…' : 'Retry live rates'}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Text style={styles.liveNote}>
+            Live rates · updated {formatCachedRateLabel(ratesFetchedAt)}
           </Text>
-        ) : __DEV__ ? (
-          <Pressable onPress={() => setRatesStatus('cached')} hitSlop={6}>
-            <Text style={styles.simulateLink}>Simulate failed fetch (use cache)</Text>
-          </Pressable>
-        ) : null}
-        {ratesStatus === 'cached' ? (
-          <Pressable onPress={() => setRatesStatus('live')} hitSlop={6}>
-            <Text style={styles.simulateLink}>{__DEV__ ? 'Back to live rates' : 'Retry live rates'}</Text>
-          </Pressable>
-        ) : null}
+        )}
       </View>
 
       <TextInput
@@ -164,7 +177,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  simulateLink: {
+  liveNote: {
+    marginTop: 6,
+    color: DashboardColors.micro,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  retryLink: {
     marginTop: 6,
     color: DashboardColors.accent,
     fontSize: 12,

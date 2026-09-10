@@ -26,9 +26,7 @@ export function ConfirmEmailModal({
           <Text style={styles.copy}>
             Is this email correct? We&apos;ll send a confirmation code there.
           </Text>
-          {otpHint ? (
-            <Text style={styles.devHint}>Dev OTP: {otpHint}</Text>
-          ) : null}
+          {otpHint ? <Text style={styles.devHint}>Code for testing: {otpHint}</Text> : null}
           <PrimaryButton label="Confirm" onPress={onConfirm} style={styles.btn} />
           <PrimaryButton label="Go back" variant="secondary" onPress={onGoBack} />
         </View>

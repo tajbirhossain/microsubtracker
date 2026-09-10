@@ -4,7 +4,8 @@ import { formatMoney } from '@/utils/subscriptions';
 
 export function buildTrialActionCards(
   subscriptions: Subscription[],
-  formatAmount: (amountUsd: number) => string = (amount) => formatMoney(amount)
+  formatAmount: (amount: number, currency: string) => string = (amount, currency) =>
+    formatMoney(amount, currency)
 ): TrialActionCard[] {
   return subscriptions
     .filter((sub) => sub.status !== 'cancelled' && sub.isTrial)
@@ -12,12 +13,13 @@ export function buildTrialActionCards(
       const daysLeft = Math.max(0, subscription.trialEndsInDays ?? 0);
       const urgency: TrialActionCard['urgency'] =
         daysLeft <= 1 ? 'critical' : daysLeft <= 3 ? 'soon' : 'upcoming';
+      const amountLabel = formatAmount(subscription.amount, subscription.currency);
 
       return {
         subscription,
         urgency,
         daysLeft,
-        chargeAmountLabel: `${formatAmount(subscription.amount)}/${subscription.billingCycle === 'yearly' ? 'yr' : 'mo'}`,
+        chargeAmountLabel: `${amountLabel}/${subscription.billingCycle === 'yearly' ? 'yr' : 'mo'}`,
         headline:
           daysLeft === 0
             ? 'Trial ends today'
@@ -26,8 +28,8 @@ export function buildTrialActionCards(
               : `Trial ends in ${daysLeft} days`,
         subcopy:
           daysLeft <= 1
-            ? `Cancel now to avoid ${formatAmount(subscription.amount)}`
-            : `Then ${formatAmount(subscription.amount)} starts charging`,
+            ? `Cancel now to avoid ${amountLabel}`
+            : `Then ${amountLabel} starts charging`,
       };
     })
     .sort((a, b) => a.daysLeft - b.daysLeft);

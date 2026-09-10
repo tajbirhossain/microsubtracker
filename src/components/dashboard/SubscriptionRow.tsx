@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function SubscriptionRow({ subscription, onPress }: Props) {
-  const { formatInCurrency } = usePreferences();
+  const { formatFromCurrency } = usePreferences();
   const dueIn = daysUntil(subscription.nextBillingDate);
   const dueLabel =
     dueIn === 0 ? 'Today' : dueIn === 1 ? 'Tomorrow' : dueIn < 0 ? 'Overdue' : `In ${dueIn}d`;
@@ -52,7 +52,9 @@ export function SubscriptionRow({ subscription, onPress }: Props) {
       </View>
 
       <View style={styles.amountCol}>
-        <Text style={styles.amount}>{formatInCurrency(subscription.amount)}</Text>
+        <Text style={styles.amount}>
+          {formatFromCurrency(subscription.amount, subscription.currency)}
+        </Text>
         <Text style={styles.cycle}>{cycleLabel(subscription.billingCycle)}</Text>
       </View>
     </Pressable>

@@ -10,12 +10,12 @@ import { DashboardColors } from '@/constants/dashboard';
 import { BottomTabInset } from '@/constants/theme';
 import { usePreferences } from '@/context/preferences-context';
 import { useSubscriptions } from '@/context/subscriptions-context';
-import { toMonthlyAmount } from '@/utils/subscriptions';
+import { toMonthlyUsd } from '@/utils/subscriptions';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { activeSubscriptions, syncNow } = useSubscriptions();
-  const { formatInCurrency } = usePreferences();
+  const { formatInCurrency, rates } = usePreferences();
   const now = new Date();
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -32,10 +32,7 @@ export default function CalendarScreen() {
     return activeSubscriptions.filter((sub) => sub.nextBillingDate === selectedDate);
   }, [selectedDate, monthSubs, activeSubscriptions]);
 
-  const monthBurn = monthSubs.reduce(
-    (sum, sub) => sum + toMonthlyAmount(sub.amount, sub.billingCycle),
-    0
-  );
+  const monthBurn = monthSubs.reduce((sum, sub) => sum + toMonthlyUsd(sub, rates), 0);
 
   const shiftMonth = (delta: number) => {
     setCursor((prev) => {

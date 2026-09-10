@@ -13,8 +13,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ServiceLogo } from '@/components/ServiceLogo';
+import { SubscriptionCurrencyPicker } from '@/components/rapid-add/SubscriptionCurrencyPicker';
 import { DashboardColors, type BillingCycle, type Subscription } from '@/constants/dashboard';
-import { usePreferences } from '@/context/preferences-context';
+import { getCurrency, isCurrencyCode, type CurrencyCode } from '@/constants/currency';
+import { formatMoney } from '@/utils/subscriptions';
 
 type Props = {
   visible: boolean;
@@ -25,6 +27,7 @@ type Props = {
     updates: {
       name: string;
       amount: number;
+      currency: CurrencyCode;
       billingCycle: BillingCycle;
       isTrial: boolean;
       trialEndsInDays?: number;
@@ -43,9 +46,9 @@ export function EditSubscriptionSheet({
   onOpenCancelGuide,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { formatInCurrency } = usePreferences();
   const [name, setName] = useState('');
   const [amountText, setAmountText] = useState('');
+  const [currency, setCurrency] = useState<CurrencyCode>('USD');
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
   const [isTrial, setIsTrial] = useState(false);
   const [trialDaysText, setTrialDaysText] = useState('7');
@@ -54,6 +57,7 @@ export function EditSubscriptionSheet({
     if (!visible || !subscription) return;
     setName(subscription.name);
     setAmountText(String(subscription.amount));
+    setCurrency(isCurrencyCode(subscription.currency) ? subscription.currency : 'USD');
     setCycle(subscription.billingCycle);
     setIsTrial(Boolean(subscription.isTrial));
     setTrialDaysText(String(subscription.trialEndsInDays ?? 7));
@@ -69,6 +73,7 @@ export function EditSubscriptionSheet({
     onSave(subscription.id, {
       name: name.trim(),
       amount,
+      currency,
       billingCycle: cycle,
       isTrial,
       trialEndsInDays: isTrial ? trialDays : undefined,
@@ -114,7 +119,7 @@ export function EditSubscriptionSheet({
                     size={48}
                   />
                   <Text style={styles.identityMeta}>
-                    Currently {formatInCurrency(subscription.amount)}
+                    Currently {formatMoney(subscription.amount, subscription.currency)}
                     {subscription.billingCycle === 'yearly'
                       ? '/yr'
                       : subscription.billingCycle === 'weekly'
@@ -133,9 +138,9 @@ export function EditSubscriptionSheet({
                   autoCapitalize="words"
                 />
 
-                <Text style={styles.label}>Price (USD)</Text>
+                <Text style={styles.label}>Price</Text>
                 <View style={styles.amountRow}>
-                  <Text style={styles.currency}>$</Text>
+                  <Text style={styles.currency}>{getCurrency(currency).symbol}</Text>
                   <TextInput
                     value={amountText}
                     onChangeText={setAmountText}
@@ -145,6 +150,8 @@ export function EditSubscriptionSheet({
                     style={styles.amountInput}
                   />
                 </View>
+
+                <SubscriptionCurrencyPicker value={currency} onChange={setCurrency} />
 
                 <Text style={styles.label}>Billing cycle</Text>
                 <View style={styles.cycleRow}>

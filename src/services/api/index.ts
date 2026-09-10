@@ -71,14 +71,21 @@ export async function getSupportedCurrencies() {
 }
 
 export async function ingestParserEvent(body: {
-  sourceType: 'sms' | 'notification';
-  rawPayload: string;
+  sourceType: 'sms' | 'notification' | 'paste' | 'receipt_image';
+  rawPayload?: string;
+  imageBase64?: string;
+  imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
   sender?: string;
   packageName?: string;
   receivedAt?: string;
   deviceKey?: string;
 }) {
-  return apiRequest<{ event: ParserEventView; needsManualEntry: boolean }>('/parser/ingest', {
+  return apiRequest<{
+    events: ParserEventView[];
+    event: ParserEventView;
+    needsManualEntry: boolean;
+    engine: 'gemini' | 'regex';
+  }>('/parser/ingest', {
     method: 'POST',
     auth: true,
     body,

@@ -34,7 +34,7 @@ export function CancelGuideDrawer({
   onKept,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { formatInCurrency } = usePreferences();
+  const { formatFromCurrency } = usePreferences();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +170,8 @@ export function CancelGuideDrawer({
                   <Text style={styles.kicker}>Cancel guide</Text>
                   <Text style={styles.title}>{subscription.name}</Text>
                   <Text style={styles.meta}>
-                    {formatInCurrency(subscription.amount)} · {subscription.billingCycle}
+                    {formatFromCurrency(subscription.amount, subscription.currency)} ·{' '}
+                    {subscription.billingCycle}
                     {subscription.isTrial
                       ? ` · trial ends in ${subscription.trialEndsInDays ?? 0}d`
                       : ''}

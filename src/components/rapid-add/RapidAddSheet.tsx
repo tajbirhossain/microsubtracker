@@ -14,9 +14,16 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ServiceLogo } from '@/components/ServiceLogo';
-import { DashboardColors, type BillingCycle } from '@/constants/dashboard';
+import { SubscriptionCurrencyPicker } from '@/components/rapid-add/SubscriptionCurrencyPicker';
+import {
+  DashboardColors,
+  SUBSCRIPTION_CATEGORIES,
+  type BillingCycle,
+} from '@/constants/dashboard';
+import { getCurrency, isCurrencyCode, type CurrencyCode } from '@/constants/currency';
 import { searchCatalog, type CatalogService } from '@/constants/service-catalog';
 import type { DraftSubscription } from '@/context/subscriptions-context';
+import { usePreferences } from '@/context/preferences-context';
 import {
   formatMoney,
   formatShortDate,
@@ -47,10 +54,15 @@ export function RapidAddSheet({
   addCustom,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { currencyCode: displayCurrency } = usePreferences();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<CatalogService | null>(null);
   const [amountText, setAmountText] = useState('');
+  const [currency, setCurrency] = useState<CurrencyCode>(
+    isCurrencyCode(displayCurrency) ? displayCurrency : 'USD'
+  );
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
+  const [category, setCategory] = useState('Productivity');
   const [customMode, setCustomMode] = useState(false);
   const [isTrial, setIsTrial] = useState(false);
   const [trialDaysText, setTrialDaysText] = useState('7');
@@ -63,7 +75,9 @@ export function RapidAddSheet({
       setQuery('');
       setSelected(null);
       setAmountText('');
+      setCurrency(isCurrencyCode(displayCurrency) ? displayCurrency : 'USD');
       setCycle('monthly');
+      setCategory('Productivity');
       setCustomMode(false);
       setIsTrial(false);
       setTrialDaysText('7');
@@ -71,7 +85,9 @@ export function RapidAddSheet({
       setStartDate(toDateKey(new Date()));
       setShowDatePicker(false);
     }
-  }, [visible]);
+  }, [visible, displayCurrency]);
+
+  const amountSymbol = getCurrency(currency).symbol;
 
   const suggestions = useMemo(() => {
     const owned = new Set(existingNames.map((name) => name.toLowerCase()));
@@ -82,7 +98,9 @@ export function RapidAddSheet({
     setSelected(service);
     setQuery(service.name);
     setAmountText(String(service.amount));
+    setCurrency(isCurrencyCode(service.currency) ? service.currency : 'USD');
     setCycle(service.billingCycle);
+    setCategory(service.category);
     setCustomMode(false);
   };
 
@@ -124,14 +142,21 @@ export function RapidAddSheet({
     };
 
     if (selected && selected.name.toLowerCase() === query.trim().toLowerCase()) {
-      addFromCatalog(selected, { amount, billingCycle: cycle, ...startFields });
+      addFromCatalog(selected, {
+        amount,
+        currency,
+        billingCycle: cycle,
+        category,
+        ...startFields,
+      });
       onAdded(selected.name);
     } else {
       addCustom({
         name: query.trim(),
         amount,
+        currency,
         billingCycle: cycle,
-        category: 'Productivity',
+        category,
         color: '#5B9EFF',
         icon: query.trim().slice(0, 1).toUpperCase(),
         ...startFields,
@@ -192,11 +217,11 @@ export function RapidAddSheet({
           {!selected && query.length === 0 ? (
             <Pressable style={styles.detectCard} onPress={onRequestParser}>
               <View style={styles.detectIcon}>
-                <Text style={styles.detectIconText}>✦</Text>
+                <Text style={styles.detectIconText}>⌁</Text>
               </View>
               <View style={styles.detectCopy}>
-                <Text style={styles.detectTitle}>Find plans for me</Text>
-                <Text style={styles.detectBody}>Scan notifications & receipts with your permission</Text>
+                <Text style={styles.detectTitle}>Scan a receipt</Text>
+                <Text style={styles.detectBody}>Paste invoice text or capture a photo to suggest a plan</Text>
               </View>
               <Text style={styles.detectChevron}>›</Text>
             </Pressable>
@@ -268,7 +293,7 @@ export function RapidAddSheet({
 
                 <Text style={styles.fieldLabel}>Price</Text>
                 <View style={styles.amountRow}>
-                  <Text style={styles.currency}>$</Text>
+                  <Text style={styles.currency}>{amountSymbol}</Text>
                   <TextInput
                     value={amountText}
                     onChangeText={setAmountText}
@@ -279,6 +304,8 @@ export function RapidAddSheet({
                     selectionColor={DashboardColors.accent}
                   />
                 </View>
+
+                <SubscriptionCurrencyPicker value={currency} onChange={setCurrency} />
 
                 <Text style={styles.fieldLabel}>Billing</Text>
                 <View style={styles.cycleRow}>
@@ -291,6 +318,23 @@ export function RapidAddSheet({
                         style={[styles.cycleChip, active && styles.cycleChipActive]}>
                         <Text style={[styles.cycleText, active && styles.cycleTextActive]}>
                           {value[0].toUpperCase() + value.slice(1)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>Category</Text>
+                <View style={styles.categoryRow}>
+                  {SUBSCRIPTION_CATEGORIES.filter((value) => value !== 'All').map((value) => {
+                    const active = category === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        onPress={() => setCategory(value)}
+                        style={[styles.categoryChip, active && styles.categoryChipActive]}>
+                        <Text style={[styles.categoryText, active && styles.categoryTextActive]}>
+                          {value}
                         </Text>
                       </Pressable>
                     );
@@ -664,6 +708,31 @@ const styles = StyleSheet.create({
   cycleRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: DashboardColors.surface,
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+  },
+  categoryChipActive: {
+    backgroundColor: DashboardColors.accentSoft,
+    borderColor: DashboardColors.accent,
+  },
+  categoryText: {
+    color: DashboardColors.textMuted,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  categoryTextActive: {
+    color: DashboardColors.accent,
   },
   cycleChip: {
     flex: 1,

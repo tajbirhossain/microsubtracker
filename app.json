@@ -35,7 +35,14 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Micro Sub Tracker to upload receipt photos for plan suggestions.",
+          "cameraPermission": "Allow Micro Sub Tracker to capture receipt photos for plan suggestions."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

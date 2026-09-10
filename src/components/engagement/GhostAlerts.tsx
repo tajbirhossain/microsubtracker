@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ServiceLogo } from '@/components/ServiceLogo';
 import { DashboardColors, type Subscription } from '@/constants/dashboard';
 import { usePreferences } from '@/context/preferences-context';
-import { toMonthlyAmount } from '@/utils/subscriptions';
+import { toMonthlyUsd } from '@/utils/subscriptions';
 
 type Props = {
   subscriptions: Subscription[];
@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function GhostAlerts({ subscriptions, onOpenGuide }: Props) {
-  const { dismissedGhostIds, dismissGhost, formatInCurrency } = usePreferences();
+  const { dismissedGhostIds, dismissGhost, formatInCurrency, rates } = usePreferences();
 
   const ghosts = subscriptions.filter(
     (sub) => (sub.unusedDays ?? 0) >= 30 && !dismissedGhostIds.includes(sub.id)
@@ -19,10 +19,7 @@ export function GhostAlerts({ subscriptions, onOpenGuide }: Props) {
 
   if (ghosts.length === 0) return null;
 
-  const quietMonthly = ghosts.reduce(
-    (sum, sub) => sum + toMonthlyAmount(sub.amount, sub.billingCycle),
-    0
-  );
+  const quietMonthly = ghosts.reduce((sum, sub) => sum + toMonthlyUsd(sub, rates), 0);
 
   return (
     <View style={styles.section}>
@@ -36,7 +33,7 @@ export function GhostAlerts({ subscriptions, onOpenGuide }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}>
         {ghosts.map((alert) => {
-          const monthly = toMonthlyAmount(alert.amount, alert.billingCycle);
+          const monthly = toMonthlyUsd(alert, rates);
           return (
             <View key={alert.id} style={styles.card}>
               <View style={styles.top}>

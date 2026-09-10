@@ -6,13 +6,15 @@ import { OfflineBanner } from '@/components/engagement/OfflineBanner';
 import { PreferencesForm } from '@/components/engagement/PreferencesForm';
 import { DashboardColors } from '@/constants/dashboard';
 import { BottomTabInset } from '@/constants/theme';
+import { usePreferences } from '@/context/preferences-context';
 import { useSubscriptions } from '@/context/subscriptions-context';
 import { sumMonthly } from '@/utils/subscriptions';
 
 export default function PreferencesScreen() {
   const insets = useSafeAreaInsets();
   const { activeSubscriptions, syncNow } = useSubscriptions();
-  const monthlyTotalUsd = sumMonthly(activeSubscriptions);
+  const { rates } = usePreferences();
+  const monthlyTotalUsd = sumMonthly(activeSubscriptions, rates);
 
   return (
     <View style={styles.root}>
@@ -37,7 +39,7 @@ export default function PreferencesScreen() {
           <Text style={styles.eyebrow}>Settings</Text>
           <Text style={styles.title}>Preferences</Text>
           <Text style={styles.subtitle}>
-            Currency, push alerts, and demo data for how Micro Sub Tracker behaves on this device.
+            Currency, notifications, and account settings for this device.
           </Text>
         </View>
 

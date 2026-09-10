@@ -14,7 +14,7 @@ type Props = {
 
 export function CurrencySheet({ visible, onClose, monthlyTotalUsd }: Props) {
   const insets = useSafeAreaInsets();
-  const { ratesStatus, currencyCode } = usePreferences();
+  const { ratesStatus, currencyCode, ratesFetchedAt } = usePreferences();
 
   return (
     <Modal
@@ -48,9 +48,10 @@ export function CurrencySheet({ visible, onClose, monthlyTotalUsd }: Props) {
 
             {ratesStatus === 'cached' ? (
               <View style={styles.cacheBanner}>
-                <Text style={styles.cacheTitle}>Cached conversion rates</Text>
+                <Text style={styles.cacheTitle}>Using saved rates</Text>
                 <Text style={styles.cacheBody}>
-                  Live FX unavailable — showing last saved rates from {formatCachedRateLabel()}.
+                  Live FX is temporarily unavailable. Showing last saved rates from{' '}
+                  {formatCachedRateLabel(ratesFetchedAt)}.
                 </Text>
               </View>
             ) : null}

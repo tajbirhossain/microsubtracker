@@ -39,8 +39,8 @@ import {
   daysUntil,
   sumMonthly,
   sumYearly,
-  toMonthlyAmount,
-  toYearlyAmount,
+  toMonthlyUsd,
+  toYearlyUsd,
 } from '@/utils/subscriptions';
 
 type Period = 'monthly' | 'yearly';
@@ -54,7 +54,6 @@ export default function HomeScreen() {
     parserConsent,
     addFromCatalog,
     addCustom,
-    addManyFromCatalog,
     updateSubscription,
     setParserConsent,
     markCancelled,
@@ -63,9 +62,8 @@ export default function HomeScreen() {
     refresh,
     syncNow,
     isReady,
-    loadDemoData,
   } = useSubscriptions();
-  const { formatInCurrency, notificationPermission } = usePreferences();
+  const { formatFromCurrency, notificationPermission, rates } = usePreferences();
 
   const [period, setPeriod] = useState<Period>('monthly');
   const [scale, setScale] = useState<ScaleFilter>('all');
@@ -127,30 +125,27 @@ export default function HomeScreen() {
     list = [...list].sort((a, b) => {
       if (sort === 'name') return a.name.localeCompare(b.name);
       if (sort === 'soonest') return a.nextBillingDate.localeCompare(b.nextBillingDate);
-      const aVal =
-        period === 'monthly'
-          ? toMonthlyAmount(a.amount, a.billingCycle)
-          : toYearlyAmount(a.amount, a.billingCycle);
-      const bVal =
-        period === 'monthly'
-          ? toMonthlyAmount(b.amount, b.billingCycle)
-          : toYearlyAmount(b.amount, b.billingCycle);
+      const aVal = period === 'monthly' ? toMonthlyUsd(a, rates) : toYearlyUsd(a, rates);
+      const bVal = period === 'monthly' ? toMonthlyUsd(b, rates) : toYearlyUsd(b, rates);
       return bVal - aVal;
     });
 
     return list;
-  }, [activeSubscriptions, scale, query, listFilter, sort, period, isReady]);
+  }, [activeSubscriptions, scale, query, listFilter, sort, period, isReady, rates]);
 
-  const monthlyTotal = sumMonthly(filtered);
-  const yearlyTotal = sumYearly(filtered);
+  const monthlyTotal = sumMonthly(filtered, rates);
+  const yearlyTotal = sumYearly(filtered, rates);
   const microSubs = filtered.filter((s) => s.scale === 'micro');
   const macroSubs = filtered.filter((s) => s.scale === 'macro');
   const amountFor = (subs: Subscription[]) =>
-    period === 'monthly' ? sumMonthly(subs) : sumYearly(subs);
+    period === 'monthly' ? sumMonthly(subs, rates) : sumYearly(subs, rates);
 
   const trialCards = useMemo(
-    () => buildTrialActionCards(activeSubscriptions, formatInCurrency).slice(0, 4),
-    [activeSubscriptions, formatInCurrency]
+    () =>
+      buildTrialActionCards(activeSubscriptions, (amount, currency) =>
+        formatFromCurrency(amount, currency)
+      ).slice(0, 4),
+    [activeSubscriptions, formatFromCurrency]
   );
 
   const hour = new Date().getHours();
@@ -158,7 +153,7 @@ export default function HomeScreen() {
   const existingNames = activeSubscriptions.map((sub) => sub.name);
   const cancelTarget = cancelSubId ? getById(cancelSubId) ?? null : null;
   const editTarget = editSubId ? getById(editSubId) ?? null : null;
-  const monthlyAll = sumMonthly(activeSubscriptions);
+  const monthlyAll = sumMonthly(activeSubscriptions, rates);
   const hasNoSubscriptions = isReady && activeSubscriptions.length === 0;
   const hasFilters =
     Boolean(query.trim()) || listFilter !== 'all' || scale !== 'all';
@@ -237,15 +232,15 @@ export default function HomeScreen() {
               periodLabel={period === 'monthly' ? 'Monthly view' : 'Yearly view'}
             />
 
-            {parserConsent === 'unknown' ? (
+            {parserConsent === 'unknown' || parserConsent === 'allowed' ? (
               <Pressable style={styles.smartBanner} onPress={() => setParserOpen(true)}>
                 <View style={styles.smartIcon}>
-                  <Text style={styles.smartIconText}>✦</Text>
+                  <Text style={styles.smartIconText}>⌁</Text>
                 </View>
                 <View style={styles.smartCopy}>
-                  <Text style={styles.smartTitle}>Find plans automatically</Text>
+                  <Text style={styles.smartTitle}>Scan a receipt</Text>
                   <Text style={styles.smartBody}>
-                    Optional — scan notifications to suggest subscriptions
+                    Paste invoice text or capture a photo to suggest a plan
                   </Text>
                 </View>
                 <Text style={styles.smartChevron}>›</Text>
@@ -256,10 +251,10 @@ export default function HomeScreen() {
               <StatePanel
                 tone="neutral"
                 title="Manual entry only"
-                body="Smart detection is off. Add plans yourself anytime — or turn detection back on."
+                body="Receipt scan is off. Add plans yourself anytime — or scan an invoice when you’re ready."
                 ctaLabel="Add a subscription"
                 onCtaPress={() => setRapidOpen(true)}
-                secondaryLabel="Enable smart detection"
+                secondaryLabel="Scan a receipt"
                 onSecondaryPress={() => setParserOpen(true)}
               />
             ) : null}
@@ -313,15 +308,11 @@ export default function HomeScreen() {
                   ctaLabel="Add a subscription"
                   onCtaPress={() => setRapidOpen(true)}
                   secondaryLabel={
-                    parserConsent === 'unknown' ? 'Find plans automatically' : 'Load demo data'
+                    parserConsent === 'unknown' ? 'Scan a receipt' : undefined
                   }
-                  onSecondaryPress={() => {
-                    if (parserConsent === 'unknown') {
-                      setParserOpen(true);
-                      return;
-                    }
-                    void loadDemoData().then(() => showToast('Demo data loaded'));
-                  }}
+                  onSecondaryPress={
+                    parserConsent === 'unknown' ? () => setParserOpen(true) : undefined
+                  }
                 />
               ) : filtered.length === 0 ? (
                 <StatePanel
@@ -390,16 +381,13 @@ export default function HomeScreen() {
       <ParserConsentSheet
         visible={parserOpen}
         onClose={() => setParserOpen(false)}
-        existingNames={existingNames}
         onAllow={() => setParserConsent('allowed')}
         onDeny={() => setParserConsent('denied')}
-        onAddDetected={(services) => {
-          addManyFromCatalog(services);
-          showToast(
-            services.length === 1 ? `Added ${services[0].name}` : `Added ${services.length} plans`
-          );
+        onAdded={(count) => {
+          showToast(count === 1 ? 'Added 1 plan from receipt' : `Added ${count} plans from receipt`);
         }}
         onManualFallback={() => setRapidOpen(true)}
+        onRefreshSubscriptions={refresh}
       />
 
       <CurrencySheet

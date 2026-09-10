@@ -1,3 +1,8 @@
+import {
+  convertToUsd,
+  FALLBACK_RATES_FROM_USD,
+  type RatesMap,
+} from '@/constants/currency';
 import type { BillingCycle, Subscription } from '@/constants/dashboard';
 
 export function toMonthlyAmount(amount: number, cycle: BillingCycle): number {
@@ -22,6 +27,35 @@ export function toYearlyAmount(amount: number, cycle: BillingCycle): number {
   }
 }
 
+export function amountInUsd(
+  amount: number,
+  currency: string,
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return convertToUsd(amount, currency, rates);
+}
+
+export function subscriptionAmountUsd(
+  sub: Pick<Subscription, 'amount' | 'currency'>,
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return amountInUsd(sub.amount, sub.currency, rates);
+}
+
+export function toMonthlyUsd(
+  sub: Pick<Subscription, 'amount' | 'currency' | 'billingCycle'>,
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return toMonthlyAmount(subscriptionAmountUsd(sub, rates), sub.billingCycle);
+}
+
+export function toYearlyUsd(
+  sub: Pick<Subscription, 'amount' | 'currency' | 'billingCycle'>,
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return toYearlyAmount(subscriptionAmountUsd(sub, rates), sub.billingCycle);
+}
+
 export function formatMoney(amount: number, currency = 'USD', compact = false): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -42,12 +76,19 @@ export function cycleLabel(cycle: BillingCycle): string {
   }
 }
 
-export function sumMonthly(subs: Subscription[]): number {
-  return subs.reduce((total, sub) => total + toMonthlyAmount(sub.amount, sub.billingCycle), 0);
+/** Sums in USD so mixed-currency subscriptions can feed burn-rate display. */
+export function sumMonthly(
+  subs: Subscription[],
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return subs.reduce((total, sub) => total + toMonthlyUsd(sub, rates), 0);
 }
 
-export function sumYearly(subs: Subscription[]): number {
-  return subs.reduce((total, sub) => total + toYearlyAmount(sub.amount, sub.billingCycle), 0);
+export function sumYearly(
+  subs: Subscription[],
+  rates: RatesMap = FALLBACK_RATES_FROM_USD
+): number {
+  return subs.reduce((total, sub) => total + toYearlyUsd(sub, rates), 0);
 }
 
 export function parseDateKey(iso: string): Date {

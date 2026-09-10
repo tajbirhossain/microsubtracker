@@ -1,71 +1,150 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ServiceLogo } from '@/components/ServiceLogo';
+import { SubscriptionCurrencyPicker } from '@/components/rapid-add/SubscriptionCurrencyPicker';
+import { isCurrencyCode, type CurrencyCode } from '@/constants/currency';
 import { DashboardColors } from '@/constants/dashboard';
 import {
-  getCatalogById,
-  MOCK_DETECTED_CHARGES,
-  type CatalogService,
-} from '@/constants/service-catalog';
+  confirmParserEvent,
+  ingestParserEvent,
+  rejectParserEvent,
+} from '@/services/api';
+import { getOrCreateDeviceKey } from '@/services/session';
+import type { ParserEventView } from '@/types/api';
 import { formatMoney } from '@/utils/subscriptions';
 
-type Step = 'consent' | 'scanning' | 'results' | 'denied';
+type Step = 'intro' | 'compose' | 'parsing' | 'results' | 'denied';
+
+type CandidateDraft = {
+  name: string;
+  amount: string;
+  currency: CurrencyCode;
+  billingCycle: 'weekly' | 'monthly' | 'yearly';
+};
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  existingNames: string[];
   onAllow: () => void;
   onDeny: () => void;
-  onAddDetected: (services: CatalogService[]) => void;
+  onAdded: (count: number) => void;
   onManualFallback: () => void;
+  onRefreshSubscriptions: () => Promise<void>;
 };
+
+function toCurrencyCode(value: string): CurrencyCode {
+  const normalized = value.trim().toUpperCase();
+  return isCurrencyCode(normalized) ? normalized : 'USD';
+}
+
+function draftFromEvent(item: ParserEventView): CandidateDraft {
+  const payload =
+    typeof item.normalizedPayload === 'object' && item.normalizedPayload
+      ? (item.normalizedPayload as Record<string, unknown>)
+      : {};
+  const cycle =
+    payload.defaultBillingCycle === 'weekly' ||
+    payload.defaultBillingCycle === 'yearly' ||
+    payload.defaultBillingCycle === 'monthly'
+      ? payload.defaultBillingCycle
+      : 'monthly';
+
+  return {
+    name: item.merchant?.trim() || '',
+    amount: item.amount != null ? String(item.amount) : '',
+    currency: toCurrencyCode(item.currency ?? 'USD'),
+    billingCycle: cycle,
+  };
+}
 
 export function ParserConsentSheet({
   visible,
   onClose,
-  existingNames,
   onAllow,
   onDeny,
-  onAddDetected,
+  onAdded,
   onManualFallback,
+  onRefreshSubscriptions,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<Step>('consent');
+  const [step, setStep] = useState<Step>('intro');
+  const [text, setText] = useState('');
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<'image/jpeg' | 'image/png' | 'image/webp'>(
+    'image/jpeg'
+  );
+  const [candidates, setCandidates] = useState<ParserEventView[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, CandidateDraft>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     if (!visible) {
-      setStep('consent');
+      setStep('intro');
+      setText('');
+      setImageUri(null);
+      setImageBase64(null);
+      setCandidates([]);
+      setDrafts({});
       setSelected({});
+      setError(null);
+      setSubmitting(false);
     }
   }, [visible]);
 
-  const detections = useMemo(() => {
-    const owned = new Set(existingNames.map((name) => name.toLowerCase()));
-    return MOCK_DETECTED_CHARGES.map((item) => ({
-      ...item,
-      service: getCatalogById(item.serviceId),
-    })).filter(
-      (item) => item.service && !owned.has(item.service.name.toLowerCase())
-    ) as Array<(typeof MOCK_DETECTED_CHARGES)[number] & { service: CatalogService }>;
-  }, [existingNames]);
-
   useEffect(() => {
     if (step !== 'results') return;
-    const initial: Record<string, boolean> = {};
-    detections.forEach((item) => {
-      initial[item.id] = true;
-    });
-    setSelected(initial);
-  }, [step, detections]);
+    const nextSelected: Record<string, boolean> = {};
+    const nextDrafts: Record<string, CandidateDraft> = {};
+    for (const item of candidates) {
+      nextSelected[item.id] = item.status === 'classified' || Boolean(item.amount);
+      nextDrafts[item.id] = draftFromEvent(item);
+    }
+    setSelected(nextSelected);
+    setDrafts(nextDrafts);
+  }, [step, candidates]);
 
-  const startScan = () => {
+  const canParse = useMemo(
+    () => text.trim().length > 0 || Boolean(imageBase64),
+    [text, imageBase64]
+  );
+
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
+  const selectedReady = useMemo(() => {
+    return candidates
+      .filter((item) => selected[item.id])
+      .every((item) => {
+        const draft = drafts[item.id];
+        const amount = Number(draft?.amount);
+        return Boolean(draft?.name.trim()) && Number.isFinite(amount) && amount > 0;
+      });
+  }, [candidates, drafts, selected]);
+
+  const updateDraft = (id: string, patch: Partial<CandidateDraft>) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], ...patch } as CandidateDraft,
+    }));
+  };
+
+  const startCompose = () => {
     onAllow();
-    setStep('scanning');
-    setTimeout(() => setStep('results'), 1400);
+    setStep('compose');
   };
 
   const deny = () => {
@@ -73,142 +152,396 @@ export function ParserConsentSheet({
     setStep('denied');
   };
 
-  const addSelected = () => {
-    const services = detections.filter((item) => selected[item.id]).map((item) => item.service);
-    onAddDetected(services);
-    onClose();
+  const pickImage = async (fromCamera: boolean) => {
+    setError(null);
+    const permission = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setError(
+        fromCamera
+          ? 'Camera permission is required to capture a receipt.'
+          : 'Photo library permission is required to upload a receipt.'
+      );
+      return;
+    }
+
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          quality: 0.55,
+          base64: true,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.55,
+          base64: true,
+        });
+
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      setError('Could not read that image. Try another photo or paste the text instead.');
+      return;
+    }
+
+    const mime =
+      asset.mimeType === 'image/png' || asset.mimeType === 'image/webp'
+        ? asset.mimeType
+        : 'image/jpeg';
+    setImageUri(asset.uri);
+    setImageBase64(asset.base64);
+    setImageMimeType(mime);
   };
 
-  const selectedCount = Object.values(selected).filter(Boolean).length;
+  const clearImage = () => {
+    setImageUri(null);
+    setImageBase64(null);
+  };
+
+  const runParse = async () => {
+    if (!canParse) return;
+    setError(null);
+    setStep('parsing');
+    try {
+      const deviceKey = await getOrCreateDeviceKey();
+      const hasImage = Boolean(imageBase64);
+      const result = await ingestParserEvent({
+        sourceType: hasImage ? 'receipt_image' : 'paste',
+        rawPayload: text.trim() || undefined,
+        imageBase64: imageBase64 ?? undefined,
+        imageMimeType: hasImage ? imageMimeType : undefined,
+        deviceKey,
+      });
+      const usable = result.events.filter((event) => event.status !== 'failed');
+      setCandidates(usable.length > 0 ? usable : result.events);
+      setStep('results');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not parse that receipt.');
+      setStep('compose');
+    }
+  };
+
+  const addSelected = async () => {
+    const chosen = candidates.filter((item) => selected[item.id]);
+    if (chosen.length === 0) return;
+
+    for (const item of chosen) {
+      const draft = drafts[item.id];
+      const amount = Number(draft?.amount);
+      if (!draft?.name.trim() || !Number.isFinite(amount) || amount <= 0) {
+        setError('Fill in name and amount for each selected plan before adding.');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      let added = 0;
+      for (const item of chosen) {
+        const draft = drafts[item.id]!;
+        await confirmParserEvent(item.id, {
+          name: draft.name.trim(),
+          amount: Number(draft.amount),
+          currency: draft.currency,
+          billingCycle: draft.billingCycle,
+        });
+        added += 1;
+      }
+      const skipped = candidates.filter((item) => !selected[item.id]);
+      await Promise.allSettled(skipped.map((item) => rejectParserEvent(item.id)));
+      await onRefreshSubscriptions();
+      onAdded(added);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add those plans.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose} />
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
         <View style={styles.handle} />
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
+          {step === 'intro' ? (
+            <View style={styles.content}>
+              <View style={styles.heroIcon}>
+                <Text style={styles.heroMark}>⌁</Text>
+              </View>
+              <Text style={styles.title}>Scan a receipt</Text>
+              <Text style={styles.body}>
+                Paste invoice text or snap a receipt photo. We suggest subscription plans — you confirm
+                what gets added. Only content you choose is sent.
+              </Text>
 
-        {step === 'consent' ? (
-          <View style={styles.content}>
-            <View style={styles.heroIcon}>
-              <Text style={styles.heroMark}>✦</Text>
+              <View style={styles.bullets}>
+                <Bullet text="Paste text or upload / capture an image" />
+                <Bullet text="Review suggestions before anything is saved" />
+                <Bullet text="Skip anytime and add plans manually" />
+              </View>
+
+              <Pressable style={styles.primaryBtn} onPress={startCompose}>
+                <Text style={styles.primaryText}>Scan a receipt</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryBtn} onPress={deny}>
+                <Text style={styles.secondaryText}>Not now</Text>
+              </Pressable>
             </View>
-            <Text style={styles.title}>Find subscriptions for you</Text>
-            <Text style={styles.body}>
-              With your OK, we can look at notification text and receipts on this device to suggest plans
-              you might be paying for. Nothing leaves your phone without your control.
-            </Text>
+          ) : null}
 
-            <View style={styles.bullets}>
-              <Bullet text="You choose what gets added" />
-              <Bullet text="Turn it off anytime in settings" />
-              <Bullet text="Skip and add plans manually instead" />
-            </View>
+          {step === 'compose' ? (
+            <View style={styles.content}>
+              <Text style={styles.title}>Add receipt details</Text>
+              <Text style={styles.body}>
+                Paste the charge text, attach a photo, or both — then we’ll suggest a plan.
+              </Text>
 
-            <Pressable style={styles.primaryBtn} onPress={startScan}>
-              <Text style={styles.primaryText}>Allow smart detection</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryBtn} onPress={deny}>
-              <Text style={styles.secondaryText}>Not now</Text>
-            </Pressable>
-          </View>
-        ) : null}
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                placeholder="Paste invoice / receipt / bank alert text…"
+                placeholderTextColor={DashboardColors.textMuted}
+                multiline
+                textAlignVertical="top"
+                style={styles.input}
+              />
 
-        {step === 'scanning' ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator color={DashboardColors.accent} size="large" />
-            <Text style={styles.title}>Looking for plans…</Text>
-            <Text style={styles.body}>Checking recent notifications and receipts</Text>
-          </View>
-        ) : null}
-
-        {step === 'results' ? (
-          <View style={styles.content}>
-            <Text style={styles.title}>We found a few</Text>
-            <Text style={styles.body}>
-              {detections.length === 0
-                ? 'Nothing new right now. You can always add plans manually.'
-                : 'Deselect anything that isn’t yours, then add the rest.'}
-            </Text>
-
-            <View style={styles.list}>
-              {detections.map((item) => {
-                const active = Boolean(selected[item.id]);
-                return (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => setSelected((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                    style={[styles.detectRow, active && styles.detectRowActive]}>
-                    <ServiceLogo
-                      name={item.service.name}
-                      providerKey={item.service.id}
-                      fallbackIcon={item.service.icon}
-                      color={item.service.color}
-                      size={42}
-                      radius={12}
-                    />
-                    <View style={styles.meta}>
-                      <Text style={styles.name}>{item.service.name}</Text>
-                      <Text style={styles.sub}>
-                        {formatMoney(item.service.amount)}/{item.service.billingCycle.slice(0, 2)} ·{' '}
-                        {item.sourceLabel}
-                      </Text>
-                    </View>
-                    <View style={[styles.check, active && styles.checkOn]}>
-                      <Text style={styles.checkMark}>{active ? '✓' : ''}</Text>
-                    </View>
+              {imageUri ? (
+                <View style={styles.previewWrap}>
+                  <Image source={{ uri: imageUri }} style={styles.preview} />
+                  <Pressable style={styles.clearImage} onPress={clearImage}>
+                    <Text style={styles.clearImageText}>Remove photo</Text>
                   </Pressable>
-                );
-              })}
-            </View>
+                </View>
+              ) : (
+                <View style={styles.imageRow}>
+                  <Pressable style={styles.imageBtn} onPress={() => void pickImage(true)}>
+                    <Text style={styles.imageBtnText}>Capture</Text>
+                  </Pressable>
+                  <Pressable style={styles.imageBtn} onPress={() => void pickImage(false)}>
+                    <Text style={styles.imageBtnText}>Upload</Text>
+                  </Pressable>
+                </View>
+              )}
 
-            {detections.length > 0 ? (
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
               <Pressable
-                style={[styles.primaryBtn, selectedCount === 0 && styles.disabled]}
-                disabled={selectedCount === 0}
-                onPress={addSelected}>
-                <Text style={[styles.primaryText, selectedCount === 0 && styles.disabledText]}>
-                  Add {selectedCount} plan{selectedCount === 1 ? '' : 's'}
+                style={[styles.primaryBtn, !canParse && styles.disabled]}
+                disabled={!canParse}
+                onPress={() => void runParse()}>
+                <Text style={[styles.primaryText, !canParse && styles.disabledText]}>
+                  Suggest plans
                 </Text>
               </Pressable>
-            ) : (
+              <Pressable style={styles.secondaryBtn} onPress={onClose}>
+                <Text style={styles.secondaryText}>Cancel</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {step === 'parsing' ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator color={DashboardColors.accent} size="large" />
+              <Text style={styles.title}>Reading your receipt…</Text>
+              <Text style={styles.body}>Extracting merchant, amount, and billing details</Text>
+            </View>
+          ) : null}
+
+          {step === 'results' ? (
+            <View style={styles.content}>
+              <Text style={styles.title}>
+                {candidates.some((c) => c.merchant || c.amount != null)
+                  ? 'Suggested plans'
+                  : 'No subscription found'}
+              </Text>
+              <Text style={styles.body}>
+                {candidates.some((c) => c.merchant || c.amount != null)
+                  ? 'Edit anything that’s wrong, then add. Name and amount are required.'
+                  : candidates[0]?.errorMessage ??
+                    'This receipt didn’t look like a trackable service charge. Try a clearer photo, paste the text too, or add manually.'}
+              </Text>
+
+              <View style={styles.list}>
+                {candidates.map((item) => {
+                  const active = Boolean(selected[item.id]);
+                  const draft = drafts[item.id] ?? draftFromEvent(item);
+                  const payload =
+                    typeof item.normalizedPayload === 'object' && item.normalizedPayload
+                      ? (item.normalizedPayload as Record<string, unknown>)
+                      : {};
+                  const oneTime = payload.recurring === false;
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.detectRow,
+                        active && styles.detectRowActive,
+                        !active && styles.detectRowMuted,
+                      ]}>
+                      <Pressable
+                        onPress={() =>
+                          setSelected((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                        }
+                        style={styles.detectHeader}>
+                        <ServiceLogo
+                          name={draft.name || 'Unknown'}
+                          providerKey={
+                            typeof payload.merchantKey === 'string'
+                              ? payload.merchantKey
+                              : undefined
+                          }
+                          fallbackIcon={typeof payload.icon === 'string' ? payload.icon : '?'}
+                          color={typeof payload.color === 'string' ? payload.color : '#555'}
+                          size={42}
+                          radius={12}
+                        />
+                        <View style={styles.meta}>
+                          <Text style={styles.name}>{draft.name || 'Unknown merchant'}</Text>
+                          <Text style={styles.sub}>
+                            {draft.amount
+                              ? oneTime
+                                ? `${formatMoney(Number(draft.amount) || 0, draft.currency)} · one-time`
+                                : `${formatMoney(Number(draft.amount) || 0, draft.currency)}/${draft.billingCycle.slice(0, 2)}`
+                              : 'Amount unclear'}
+                            {' · tap to select'}
+                          </Text>
+                        </View>
+                        <View style={[styles.check, active && styles.checkOn]}>
+                          <Text style={styles.checkMark}>{active ? '✓' : ''}</Text>
+                        </View>
+                      </Pressable>
+
+                      {active ? (
+                        <View style={styles.editBlock}>
+                          <Text style={styles.editLabel}>Name</Text>
+                          <TextInput
+                            value={draft.name}
+                            onChangeText={(value) => updateDraft(item.id, { name: value })}
+                            placeholder="e.g. Google"
+                            placeholderTextColor={DashboardColors.textMuted}
+                            style={styles.editInput}
+                          />
+                          <View style={styles.editRow}>
+                            <View style={styles.editHalf}>
+                              <Text style={styles.editLabel}>Amount</Text>
+                              <TextInput
+                                value={draft.amount}
+                                onChangeText={(value) =>
+                                  updateDraft(item.id, {
+                                    amount: value.replace(/[^0-9.]/g, ''),
+                                  })
+                                }
+                                keyboardType="decimal-pad"
+                                placeholder="25.00"
+                                placeholderTextColor={DashboardColors.textMuted}
+                                style={styles.editInput}
+                              />
+                            </View>
+                            <View style={styles.editHalf}>
+                              <SubscriptionCurrencyPicker
+                                value={draft.currency}
+                                onChange={(code) => updateDraft(item.id, { currency: code })}
+                              />
+                            </View>
+                          </View>
+                          <Text style={styles.editLabel}>Billing cycle</Text>
+                          <View style={styles.cycleRow}>
+                            {(['weekly', 'monthly', 'yearly'] as const).map((cycle) => {
+                              const on = draft.billingCycle === cycle;
+                              return (
+                                <Pressable
+                                  key={cycle}
+                                  onPress={() => updateDraft(item.id, { billingCycle: cycle })}
+                                  style={[styles.cycleChip, on && styles.cycleChipOn]}>
+                                  <Text style={[styles.cycleChipText, on && styles.cycleChipTextOn]}>
+                                    {cycle}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              {selectedCount > 0 ? (
+                <Pressable
+                  style={[
+                    styles.primaryBtn,
+                    (!selectedReady || submitting) && styles.disabled,
+                  ]}
+                  disabled={!selectedReady || submitting}
+                  onPress={() => void addSelected()}>
+                  <Text
+                    style={[
+                      styles.primaryText,
+                      (!selectedReady || submitting) && styles.disabledText,
+                    ]}>
+                    {submitting
+                      ? 'Adding…'
+                      : selectedReady
+                        ? `Add ${selectedCount} plan${selectedCount === 1 ? '' : 's'}`
+                        : 'Fill name & amount'}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    onClose();
+                    onManualFallback();
+                  }}>
+                  <Text style={styles.primaryText}>Add manually</Text>
+                </Pressable>
+              )}
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => {
+                  setStep('compose');
+                  setError(null);
+                }}>
+                <Text style={styles.secondaryText}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {step === 'denied' ? (
+            <View style={styles.content}>
+              <View style={[styles.heroIcon, styles.heroMuted]}>
+                <Text style={styles.heroMark}>✎</Text>
+              </View>
+              <Text style={styles.title}>No problem — add manually</Text>
+              <Text style={styles.body}>
+                Receipt scan stays off for now. You can still add any plan in a few taps, and open scan
+                later when you want suggestions from an invoice.
+              </Text>
               <Pressable
                 style={styles.primaryBtn}
                 onPress={() => {
                   onClose();
                   onManualFallback();
                 }}>
-                <Text style={styles.primaryText}>Add manually</Text>
+                <Text style={styles.primaryText}>Add a plan manually</Text>
               </Pressable>
-            )}
-            <Pressable style={styles.secondaryBtn} onPress={onClose}>
-              <Text style={styles.secondaryText}>Done</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {step === 'denied' ? (
-          <View style={styles.content}>
-            <View style={[styles.heroIcon, styles.heroMuted]}>
-              <Text style={styles.heroMark}>✎</Text>
+              <Pressable style={styles.secondaryBtn} onPress={onClose}>
+                <Text style={styles.secondaryText}>Close</Text>
+              </Pressable>
             </View>
-            <Text style={styles.title}>No problem — add manually</Text>
-            <Text style={styles.body}>
-              Smart detection stays off. You can still add any plan in a few taps, and turn detection on
-              later if you change your mind.
-            </Text>
-            <Pressable
-              style={styles.primaryBtn}
-              onPress={() => {
-                onClose();
-                onManualFallback();
-              }}>
-              <Text style={styles.primaryText}>Add a plan manually</Text>
-            </Pressable>
-            <Pressable style={styles.secondaryBtn} onPress={onClose}>
-              <Text style={styles.secondaryText}>Close</Text>
-            </Pressable>
-          </View>
-        ) : null}
+          ) : null}
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -237,6 +570,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    maxHeight: '92%',
     backgroundColor: '#0B0B0D',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -252,6 +586,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginBottom: 14,
+  },
+  scrollContent: {
+    paddingBottom: 8,
   },
   content: {
     gap: 12,
@@ -309,6 +646,60 @@ const styles = StyleSheet.create({
     color: DashboardColors.text,
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
+  },
+  input: {
+    minHeight: 120,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+    backgroundColor: DashboardColors.surface,
+    color: DashboardColors.text,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  imageRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  imageBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: DashboardColors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+  },
+  imageBtnText: {
+    color: DashboardColors.text,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  previewWrap: {
+    gap: 8,
+  },
+  preview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 14,
+    backgroundColor: DashboardColors.surface,
+  },
+  clearImage: {
+    alignSelf: 'flex-start',
+  },
+  clearImageText: {
+    color: DashboardColors.accent,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  error: {
+    color: '#F87171',
+    fontSize: 13,
+    lineHeight: 18,
   },
   list: {
     gap: 8,
@@ -316,18 +707,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 10,
     padding: 12,
     borderRadius: 14,
     backgroundColor: DashboardColors.surface,
     borderWidth: 1,
     borderColor: DashboardColors.border,
   },
+  detectHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   detectRowActive: {
     borderColor: DashboardColors.accent,
     backgroundColor: DashboardColors.accentSoft,
+  },
+  detectRowMuted: {
+    opacity: 0.7,
   },
   meta: {
     flex: 1,
@@ -341,6 +738,60 @@ const styles = StyleSheet.create({
   sub: {
     color: DashboardColors.textMuted,
     fontSize: 12,
+  },
+  editBlock: {
+    gap: 8,
+    paddingTop: 4,
+  },
+  editLabel: {
+    color: DashboardColors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  editInput: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+    backgroundColor: DashboardColors.surfaceElevated,
+    color: DashboardColors.text,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  editRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editHalf: {
+    flex: 1,
+    gap: 8,
+  },
+  cycleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cycleChip: {
+    flex: 1,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DashboardColors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: DashboardColors.border,
+  },
+  cycleChipOn: {
+    backgroundColor: DashboardColors.accent,
+    borderColor: DashboardColors.accent,
+  },
+  cycleChipText: {
+    color: DashboardColors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  cycleChipTextOn: {
+    color: '#fff',
   },
   check: {
     width: 24,

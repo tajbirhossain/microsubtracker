@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { type BillingCycle, type Subscription } from '@/constants/dashboard';
+import { convertToUsd } from '@/constants/currency';
 import type { CatalogService } from '@/constants/service-catalog';
 import { useNetwork } from '@/context/network-context';
 import { useOnboarding } from '@/context/onboarding-context';
@@ -103,8 +104,14 @@ function trialEndsIso(daysFromNow: number): string {
   return toDateKey(date);
 }
 
-function scaleForAmount(amount: number, cycle: BillingCycle): Subscription['scale'] {
-  const monthly = cycle === 'yearly' ? amount / 12 : cycle === 'weekly' ? (amount * 52) / 12 : amount;
+function scaleForAmount(
+  amount: number,
+  cycle: BillingCycle,
+  currency = 'USD'
+): Subscription['scale'] {
+  const amountUsd = convertToUsd(amount, currency);
+  const monthly =
+    cycle === 'yearly' ? amountUsd / 12 : cycle === 'weekly' ? (amountUsd * 52) / 12 : amountUsd;
   return monthly >= 20 ? 'macro' : 'micro';
 }
 
@@ -234,7 +241,7 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
         currency: draft.currency ?? 'USD',
         billingCycle: draft.billingCycle,
         category: draft.category,
-        scale: scaleForAmount(draft.amount, draft.billingCycle),
+        scale: scaleForAmount(draft.amount, draft.billingCycle, draft.currency ?? 'USD'),
         nextBillingDate,
         color: draft.color,
         icon: draft.icon,
@@ -324,6 +331,7 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
 
       const amount = updates.amount ?? current.amount;
       const billingCycle = updates.billingCycle ?? current.billingCycle;
+      const currency = updates.currency ?? current.currency;
       const isTrial = updates.isTrial ?? current.isTrial;
       const trialEndsInDays =
         updates.isTrial === false
@@ -336,8 +344,9 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
         ...current,
         ...updates,
         amount,
+        currency,
         billingCycle,
-        scale: scaleForAmount(amount, billingCycle),
+        scale: scaleForAmount(amount, billingCycle, currency),
         isTrial: Boolean(isTrial),
         trialEndsInDays: isTrial ? trialEndsInDays : undefined,
         nextBillingDate:

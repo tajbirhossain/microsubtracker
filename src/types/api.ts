@@ -141,7 +141,7 @@ export type CurrencyRatesResult = {
 
 export type ParserEventView = {
   id: string;
-  sourceType: 'sms' | 'notification';
+  sourceType: 'sms' | 'notification' | 'paste' | 'receipt_image';
   rawPayload: string;
   merchant: string | null;
   amount: number | null;

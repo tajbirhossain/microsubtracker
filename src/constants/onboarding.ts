@@ -195,11 +195,12 @@ export const PLANS: PlanTier[] = [
     accent: ['#3D2A6B', '#12081F'],
     benefits: [
       {
-        id: 'fast-add',
-        icon: '⚡',
-        perkLabel: 'Add plans\nin seconds',
-        title: 'Add a plan in seconds',
-        description: 'Start typing a name and we\'ll fill in the rest for you',
+        id: 'receipt-scan',
+        icon: '🧾',
+        perkLabel: 'Scan\nreceipts',
+        title: 'Suggest plans from receipts',
+        description:
+          'Paste invoice text or snap a receipt — we extract the plan so you can confirm in one tap',
       },
       {
         id: 'forgot',
