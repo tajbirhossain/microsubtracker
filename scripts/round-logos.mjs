@@ -7,29 +7,37 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const brandSvg = path.join(root, "assets", "brand", "logo-mark.svg");
 const imagesDir = path.join(root, "assets", "images");
 
-/**
- * Render the brand mark edge-to-edge with rounded corners (transparent outside).
- * No cream padding — splash backgroundColor handles that.
- */
-async function writeRoundedMark(outFile, size, radiusRatio = 0.25) {
-  const radius = Math.round(size * radiusRatio);
-  const svg = fs
-    .readFileSync(brandSvg, "utf8")
+function readMarkSvg(rounded) {
+  let svg = fs.readFileSync(brandSvg, "utf8");
+  if (!rounded) {
+    // Full-bleed square for Android 12+ splash (system applies its own mask).
+    svg = svg.replace(/\s+rx="[^"]*"\s+ry="[^"]*"/, "");
+  }
+  return svg;
+}
+
+async function writePng(outFile, size, { rounded }) {
+  const svg = readMarkSvg(rounded)
     .replace(/width="1024"/, `width="${size}"`)
     .replace(/height="1024"/, `height="${size}"`);
 
-  const mark = await sharp(Buffer.from(svg)).resize(size, size).png().toBuffer();
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="#fff"/></svg>`
-  );
+  let pipeline = sharp(Buffer.from(svg)).resize(size, size);
 
-  await sharp(mark)
-    .composite([{ input: mask, blend: "dest-in" }])
-    .png()
-    .toFile(path.join(imagesDir, outFile));
+  if (rounded) {
+    const radius = Math.round(size * 0.25);
+    const mask = Buffer.from(
+      `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="#fff"/></svg>`
+    );
+    pipeline = pipeline.composite([{ input: mask, blend: "dest-in" }]);
+  }
 
-  console.log(`wrote ${outFile} (${size}px, r=${radius})`);
+  await pipeline.png().toFile(path.join(imagesDir, outFile));
+  console.log(`wrote ${outFile} (${size}px, rounded=${rounded})`);
 }
 
-await writeRoundedMark("app-logo.png", 512, 0.25);
-await writeRoundedMark("splash-icon.png", 512, 0.25);
+// In-app / JS splash overlay — matches the SVG squircle.
+await writePng("app-logo.png", 512, { rounded: true });
+
+// Native Android splash — sharp full-bleed square (no transparent corners).
+// Android 12+ masks this; pre-rounding caused cream gaps inside the system mask.
+await writePng("splash-icon.png", 512, { rounded: false });
