@@ -1,9 +1,7 @@
 name: Build Android APK
 
-# Builds an APK on GitHub (no EAS / Expo cloud) and publishes it to Releases.
+# Builds a shareable release APK on GitHub (no EAS) and publishes it to Releases.
 # Share: https://github.com/tajbirhossain/microsubtracker/releases/tag/preview-latest
-#
-# No Expo token required.
 
 on:
   workflow_dispatch:
@@ -33,6 +31,8 @@ jobs:
     env:
       CI: "1"
       EXPO_PUBLIC_API_URL: https://microsubtrackerbackend.onrender.com/api
+      # Real phones only — skips x86 emulator ABIs (faster + much smaller APK)
+      ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
 
     steps:
       - name: Checkout
@@ -41,7 +41,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Java
@@ -49,9 +49,20 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm ci
@@ -59,16 +70,16 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --build-cache
 
       - name: Stage APK
         run: |
           set -euo pipefail
-          SRC="$(find android/app/build/outputs/apk -name '*.apk' | head -n 1)"
+          SRC="$(find android/app/build/outputs/apk/release -name '*.apk' | head -n 1)"
           if [ -z "$SRC" ]; then
-            echo "APK not found under android/app/build/outputs/apk"
+            echo "APK not found under android/app/build/outputs/apk/release"
             find android/app/build/outputs -type f -name '*.apk' || true
             exit 1
           fi
@@ -81,10 +92,12 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          NOTES="$(printf '%s\n\n%s\n%s\n' \
+          SIZE="$(du -h microsubtracker-preview.apk | cut -f1)"
+          NOTES="$(printf '%s\n\n%s\n%s\n%s\n' \
             "Preview APK for recruiters (no Expo account needed)." \
             "Commit: ${GITHUB_SHA}" \
-            "Install on Android: download the APK → allow unknown apps → open the file.")"
+            "Size: ${SIZE}" \
+            "Install: uninstall any older Micro Sub Tracker build first, then download this APK → allow unknown apps → open the file.")"
 
           if gh release view preview-latest >/dev/null 2>&1; then
             gh release delete preview-latest --yes --cleanup-tag
