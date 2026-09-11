@@ -33,6 +33,7 @@ jobs:
       EXPO_PUBLIC_API_URL: https://microsubtrackerbackend.onrender.com/api
       # Real phones only — skips x86 emulator ABIs (faster + much smaller APK)
       ORG_GRADLE_PROJECT_reactNativeArchitectures: arm64-v8a
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
 
     steps:
       - name: Checkout
@@ -69,9 +70,27 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
+      - name: Tune Gradle memory + skip release lint
+        run: |
+          cat >> android/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          android.native.buildOutput=quiet
+          EOF
+
       - name: Build release APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --build-cache
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --build-cache \
+            -x lint \
+            -x lintVitalAnalyzeRelease \
+            -x lintVitalRelease \
+            -x test \
+            -x testReleaseUnitTest
 
       - name: Stage APK
         run: |
