@@ -1,0 +1,100 @@
+name: Build Android APK
+
+# Builds an APK on GitHub (no EAS / Expo cloud) and publishes it to Releases.
+# Share: https://github.com/tajbirhossain/microsubtracker/releases/tag/preview-latest
+#
+# No Expo token required.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "assets/**"
+      - ".github/workflows/build-android-apk.yml"
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Gradle preview APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    env:
+      CI: "1"
+      EXPO_PUBLIC_API_URL: https://microsubtrackerbackend.onrender.com/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: Stage APK
+        run: |
+          set -euo pipefail
+          SRC="$(find android/app/build/outputs/apk -name '*.apk' | head -n 1)"
+          if [ -z "$SRC" ]; then
+            echo "APK not found under android/app/build/outputs/apk"
+            find android/app/build/outputs -type f -name '*.apk' || true
+            exit 1
+          fi
+          cp "$SRC" microsubtracker-preview.apk
+          ls -lh microsubtracker-preview.apk
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          NOTES="$(printf '%s\n\n%s\n%s\n' \
+            "Preview APK for recruiters (no Expo account needed)." \
+            "Commit: ${GITHUB_SHA}" \
+            "Install on Android: download the APK → allow unknown apps → open the file.")"
+
+          if gh release view preview-latest >/dev/null 2>&1; then
+            gh release delete preview-latest --yes --cleanup-tag
+          fi
+
+          gh release create preview-latest \
+            microsubtracker-preview.apk \
+            --title "Preview APK (${SHORT_SHA})" \
+            --notes "$NOTES" \
+            --prerelease
+
+          echo "Share this link:"
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/preview-latest"
