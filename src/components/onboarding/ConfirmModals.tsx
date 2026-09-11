@@ -7,6 +7,7 @@ type ConfirmEmailProps = {
   visible: boolean;
   email: string;
   otpHint?: string;
+  loading?: boolean;
   onConfirm: () => void;
   onGoBack: () => void;
 };
@@ -15,11 +16,16 @@ export function ConfirmEmailModal({
   visible,
   email,
   otpHint,
+  loading = false,
   onConfirm,
   onGoBack,
 }: ConfirmEmailProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onGoBack}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={loading ? undefined : onGoBack}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.phone}>{email}</Text>
@@ -27,8 +33,21 @@ export function ConfirmEmailModal({
             Is this email correct? We&apos;ll send a confirmation code there.
           </Text>
           {otpHint ? <Text style={styles.devHint}>Code for testing: {otpHint}</Text> : null}
-          <PrimaryButton label="Confirm" onPress={onConfirm} style={styles.btn} />
-          <PrimaryButton label="Go back" variant="secondary" onPress={onGoBack} />
+          {loading ? (
+            <Text style={styles.processing}>Sending confirmation code…</Text>
+          ) : null}
+          <PrimaryButton
+            label="Confirm"
+            loading={loading}
+            onPress={onConfirm}
+            style={styles.btn}
+          />
+          <PrimaryButton
+            label="Go back"
+            variant="secondary"
+            disabled={loading}
+            onPress={onGoBack}
+          />
         </View>
       </View>
     </Modal>
@@ -107,6 +126,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 8,
+  },
+  processing: {
+    color: OnboardingColors.link,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 4,
   },
   devHint: {
     color: OnboardingColors.link,

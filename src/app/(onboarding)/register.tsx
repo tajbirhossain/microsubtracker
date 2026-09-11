@@ -28,18 +28,22 @@ export default function RegisterScreen() {
   };
 
   const onConfirmEmail = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
-    const result = await submitCredentials();
-    setLoading(false);
-    if (!result.ok) {
+    try {
+      const result = await submitCredentials();
+      if (!result.ok) {
+        setConfirmOpen(false);
+        setError(result.error ?? 'Unable to create account');
+        return;
+      }
+      setOtpHint(result.otpHint);
       setConfirmOpen(false);
-      setError(result.error ?? 'Unable to create account');
-      return;
+      router.push('/(onboarding)/verify-code');
+    } finally {
+      setLoading(false);
     }
-    setOtpHint(result.otpHint);
-    setConfirmOpen(false);
-    router.push('/(onboarding)/verify-code');
   };
 
   return (
@@ -99,7 +103,10 @@ export default function RegisterScreen() {
         visible={confirmOpen}
         email={draft.email.trim().toLowerCase()}
         otpHint={otpHint}
-        onGoBack={() => setConfirmOpen(false)}
+        loading={loading}
+        onGoBack={() => {
+          if (!loading) setConfirmOpen(false);
+        }}
         onConfirm={onConfirmEmail}
       />
     </OnboardingShell>
