@@ -17,9 +17,10 @@ import {
   registerStart,
   registerVerify,
   resendOtp,
+  updateProfile,
 } from '@/services/api/auth';
 import { ApiError } from '@/services/api/client';
-import { clearSession, getStoredUser, hasStoredSession } from '@/services/session';
+import { clearSession, getStoredUser, hasStoredSession, updateStoredUser } from '@/services/session';
 import type { AuthUser, OtpPurpose } from '@/types/api';
 import type { Country } from '@/constants/onboarding';
 import { COUNTRIES } from '@/constants/onboarding';
@@ -56,6 +57,7 @@ type OnboardingContextValue = {
   submitCredentials: () => Promise<ActionResult>;
   verifyCode: (code: string) => Promise<ActionResult>;
   resendCode: () => Promise<ActionResult>;
+  saveDisplayName: () => Promise<ActionResult>;
   completeOnboarding: () => Promise<{ ok: boolean }>;
   signOut: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -120,6 +122,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       try {
         const me = await fetchMe();
         setUser(me);
+        await updateStoredUser(me);
       } catch {
         if (!stored) {
           await clearSession();
@@ -220,6 +223,26 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
   }, [authMode, draft.email, otpPurpose]);
 
+  const saveDisplayName = useCallback(async (): Promise<ActionResult> => {
+    const displayName = [draft.firstName, draft.lastName]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    if (!displayName) {
+      return { ok: false, error: 'Enter your first and last name' };
+    }
+
+    try {
+      const updated = await updateProfile({ displayName });
+      setUser(updated);
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: errorMessage(error, 'Could not save your name') };
+    }
+  }, [draft.firstName, draft.lastName]);
+
   const completeOnboarding = useCallback(async () => {
     return { ok: true };
   }, []);
@@ -249,6 +272,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       submitCredentials,
       verifyCode,
       resendCode,
+      saveDisplayName,
       completeOnboarding,
       signOut,
       restoreSession,
@@ -265,6 +289,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       submitCredentials,
       verifyCode,
       resendCode,
+      saveDisplayName,
       completeOnboarding,
       signOut,
       restoreSession,

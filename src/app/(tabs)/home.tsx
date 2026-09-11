@@ -29,6 +29,7 @@ import { StatePanel } from '@/components/ui/StatePanel';
 import { DashboardColors, type SpendScale, type Subscription } from '@/constants/dashboard';
 import { BottomTabInset } from '@/constants/theme';
 import { useNetwork } from '@/context/network-context';
+import { useOnboarding } from '@/context/onboarding-context';
 import { usePreferences } from '@/context/preferences-context';
 import {
   useSubscriptions,
@@ -46,6 +47,23 @@ import {
 
 type Period = 'monthly' | 'yearly';
 type ScaleFilter = SpendScale | 'all';
+
+function greetingName(displayName: string | null | undefined): string | null {
+  if (!displayName?.trim()) return null;
+  return displayName.trim().split(/\s+/)[0] ?? null;
+}
+
+function avatarInitials(displayName: string | null | undefined, email?: string | null): string {
+  const parts = displayName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+  }
+  if (parts.length === 1 && parts[0]) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  const fromEmail = email?.trim()?.[0];
+  return (fromEmail ?? 'U').toUpperCase();
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -65,6 +83,7 @@ export default function HomeScreen() {
     isReady,
   } = useSubscriptions();
   const { formatFromCurrency, notificationPermission, rates } = usePreferences();
+  const { user } = useOnboarding();
 
   const [period, setPeriod] = useState<Period>('monthly');
   const [scale, setScale] = useState<ScaleFilter>('all');
@@ -150,7 +169,10 @@ export default function HomeScreen() {
   );
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const firstName = greetingName(user?.displayName);
+  const greeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
+  const initials = avatarInitials(user?.displayName, user?.email);
   const existingNames = activeSubscriptions.map((sub) => sub.name);
   const cancelTarget = cancelSubId ? getById(cancelSubId) ?? null : null;
   const editTarget = editSubId ? getById(editSubId) ?? null : null;
@@ -206,7 +228,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/preferences')}
               accessibilityRole="button"
               accessibilityLabel="Open preferences">
-              <Text style={styles.avatarText}>T</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </Pressable>
           </View>
         </View>

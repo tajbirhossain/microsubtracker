@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BackButton } from '@/components/onboarding/BackButton';
 import { ErrorSheet } from '@/components/onboarding/ConfirmModals';
@@ -14,8 +14,15 @@ export default function VerifyCodeScreen() {
     useOnboarding();
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(15);
+  const [verifying, setVerifying] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('Please check the code and try again');
+  const lastTriedCode = useRef<string | null>(null);
+  const verifyCodeRef = useRef(verifyCode);
+  const completeOnboardingRef = useRef(completeOnboarding);
+
+  verifyCodeRef.current = verifyCode;
+  completeOnboardingRef.current = completeOnboarding;
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -25,32 +32,35 @@ export default function VerifyCodeScreen() {
 
   useEffect(() => {
     if (code.length !== 6) return;
-    let cancelled = false;
-    (async () => {
-      const result = await verifyCode(code);
-      if (cancelled) return;
+    if (lastTriedCode.current === code) return;
+    lastTriedCode.current = code;
+    setVerifying(true);
+
+    void (async () => {
+      const result = await verifyCodeRef.current(code);
+
       if (result.ok) {
         if (authMode === 'login') {
-          await completeOnboarding();
+          await completeOnboardingRef.current();
           router.replace('/(tabs)/home');
         } else {
           router.push('/(onboarding)/notifications');
         }
-      } else {
-        setErrorMessage(result.error ?? 'Please check the code and try again');
-        setErrorOpen(true);
+        return;
       }
+
+      setVerifying(false);
+      setErrorMessage(result.error ?? 'Please check the code and try again');
+      setErrorOpen(true);
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, verifyCode, authMode, completeOnboarding]);
+  }, [code, authMode]);
 
   const onResend = async () => {
-    if (seconds > 0) return;
+    if (seconds > 0 || verifying) return;
     await resendCode();
     setSeconds(15);
     setCode('');
+    lastTriedCode.current = null;
   };
 
   return (
@@ -64,7 +74,12 @@ export default function VerifyCodeScreen() {
 
       <OtpInput value={code} onChange={setCode} />
 
-      {seconds > 0 ? (
+      {verifying ? (
+        <View style={styles.verifyingRow}>
+          <ActivityIndicator color={OnboardingColors.link} />
+          <Text style={styles.verifyingText}>Verifying code…</Text>
+        </View>
+      ) : seconds > 0 ? (
         <Text style={styles.timer}>Resend code in 00:{String(seconds).padStart(2, '0')}</Text>
       ) : (
         <Pressable onPress={onResend}>
@@ -79,6 +94,7 @@ export default function VerifyCodeScreen() {
         onDismiss={() => {
           setErrorOpen(false);
           setCode('');
+          lastTriedCode.current = null;
         }}
       />
     </OnboardingShell>
@@ -101,6 +117,16 @@ const styles = StyleSheet.create({
     color: OnboardingColors.link,
     fontSize: 14,
     marginTop: 10,
+  },
+  verifyingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
+  },
+  verifyingText: {
+    color: OnboardingColors.link,
+    fontSize: 15,
   },
   timer: {
     color: OnboardingColors.text,

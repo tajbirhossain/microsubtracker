@@ -25,6 +25,9 @@ export function PreferencesForm({ monthlyTotalUsd }: Props) {
       {isAuthenticated && user ? (
         <>
           <Text style={styles.sectionLabel}>Account</Text>
+          {user.displayName ? (
+            <Text style={styles.sectionHint}>{user.displayName}</Text>
+          ) : null}
           <Text style={styles.sectionHint}>{user.email}</Text>
           <StatePanel
             title="Signed in"

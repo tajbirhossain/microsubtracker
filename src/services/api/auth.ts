@@ -6,6 +6,7 @@ import {
   getOrCreateDeviceKey,
   getRefreshToken,
   saveSession,
+  updateStoredUser,
 } from '@/services/session';
 import type {
   AuthSessionResult,
@@ -85,6 +86,18 @@ export async function resendOtp(input: {
 
 export async function fetchMe(): Promise<AuthUser> {
   const data = await apiRequest<{ user: AuthUser }>('/auth/me', { auth: true });
+  return data.user;
+}
+
+export async function updateProfile(input: {
+  displayName: string;
+}): Promise<AuthUser> {
+  const data = await apiRequest<{ user: AuthUser }>('/auth/me', {
+    method: 'PATCH',
+    auth: true,
+    body: { displayName: input.displayName.trim() },
+  });
+  await updateStoredUser(data.user);
   return data.user;
 }
 

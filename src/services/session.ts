@@ -105,6 +105,10 @@ export async function getStoredUser(): Promise<AuthUser | null> {
   }
 }
 
+export async function updateStoredUser(user: AuthUser): Promise<void> {
+  await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
+}
+
 export async function hasStoredSession(): Promise<boolean> {
   const [access, refresh] = await Promise.all([getAccessToken(), getRefreshToken()]);
   return Boolean(access && refresh);
