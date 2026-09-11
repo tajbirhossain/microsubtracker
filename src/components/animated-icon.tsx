@@ -1,79 +1,96 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, Keyframe } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { BrandColors } from '@/constants/brand';
 
-const DURATION = 600;
+const FADE_MS = 450;
+const MAX_SPLASH_MS = 2500;
 
 export function AnimatedSplashOverlay() {
-  const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+  const started = useRef(false);
+  const done = useRef(false);
+  const opacity = useSharedValue(1);
+
+  const finish = () => {
+    if (done.current) return;
+    done.current = true;
+    setVisible(false);
+  };
+
+  const startExit = () => {
+    if (started.current) return;
+    started.current = true;
+
+    void SplashScreen.hideAsync().catch(() => undefined);
+
+    opacity.value = withTiming(
+      0,
+      { duration: FADE_MS, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) {
+          runOnJS(finish)();
+        }
+      }
+    );
+
+    setTimeout(() => {
+      finish();
+    }, FADE_MS + 400);
+  };
+
+  useEffect(() => {
+    const boot = setTimeout(startExit, 350);
+    const forceHide = setTimeout(() => {
+      void SplashScreen.hideAsync().catch(() => undefined);
+      finish();
+    }, MAX_SPLASH_MS);
+
+    return () => {
+      clearTimeout(boot);
+      clearTimeout(forceHide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only splash boot
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   if (!visible) return null;
 
-  const splashKeyframe = new Keyframe({
-    0: {
-      transform: [{ scale: 1 }],
-      opacity: 1,
-    },
-    20: {
-      opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
-    },
-    100: {
-      opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
-    },
-  });
-
-  const image = (
-    <Image
-      style={styles.image}
-      source={require('@/assets/images/app-logo.png')}
-      contentFit="contain"
-    />
-  );
-
-  return animate ? (
-    <Animated.View
-      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
-        'worklet';
-        if (finished) {
-          scheduleOnRN(setVisible, false);
-        }
-      })}
-      style={styles.splashOverlay}>
-      {image}
+  return (
+    <Animated.View style={[styles.splashOverlay, animatedStyle]} pointerEvents="none">
+      <View style={styles.logoClip}>
+        <Image
+          style={styles.image}
+          source={require('@/assets/images/app-logo.png')}
+          contentFit="cover"
+        />
+      </View>
     </Animated.View>
-  ) : (
-    <View
-      onLayout={() => {
-        SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
-        });
-      }}
-      style={styles.splashOverlay}>
-      {image}
-    </View>
   );
 }
 
 export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
-      <Image
-        style={styles.heroLogo}
-        source={require('@/assets/images/app-logo.png')}
-        contentFit="contain"
-      />
+      <View style={styles.heroClip}>
+        <Image
+          style={styles.heroLogo}
+          source={require('@/assets/images/app-logo.png')}
+          contentFit="cover"
+        />
+      </View>
     </View>
   );
 }
@@ -86,15 +103,27 @@ const styles = StyleSheet.create({
     height: 128,
     zIndex: 100,
   },
-  image: {
+  logoClip: {
     width: 112,
     height: 112,
     borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: BrandColors.mint,
   },
-  heroLogo: {
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  heroClip: {
     width: 128,
     height: 128,
     borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: BrandColors.mint,
+  },
+  heroLogo: {
+    width: '100%',
+    height: '100%',
   },
   splashOverlay: {
     ...StyleSheet.absoluteFillObject,

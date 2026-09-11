@@ -120,7 +120,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (stored) setUser(stored);
 
       try {
-        const me = await fetchMe();
+        const me = await Promise.race([
+          fetchMe(),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Session restore timed out')), 12_000);
+          }),
+        ]);
         setUser(me);
         await updateStoredUser(me);
       } catch {
