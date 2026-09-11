@@ -70,13 +70,11 @@ export function AnimatedSplashOverlay() {
 
   return (
     <Animated.View style={[styles.splashOverlay, animatedStyle]} pointerEvents="none">
-      <View style={styles.logoClip}>
-        <Image
-          style={styles.image}
-          source={require('@/assets/images/app-logo.png')}
-          contentFit="cover"
-        />
-      </View>
+      <Image
+        style={styles.image}
+        source={require('@/assets/images/app-logo.png')}
+        contentFit="contain"
+      />
     </Animated.View>
   );
 }
@@ -84,13 +82,11 @@ export function AnimatedSplashOverlay() {
 export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
-      <View style={styles.heroClip}>
-        <Image
-          style={styles.heroLogo}
-          source={require('@/assets/images/app-logo.png')}
-          contentFit="cover"
-        />
-      </View>
+      <Image
+        style={styles.heroLogo}
+        source={require('@/assets/images/app-logo.png')}
+        contentFit="contain"
+      />
     </View>
   );
 }
@@ -103,27 +99,13 @@ const styles = StyleSheet.create({
     height: 128,
     zIndex: 100,
   },
-  logoClip: {
-    width: 112,
-    height: 112,
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: BrandColors.mint,
-  },
   image: {
-    width: '100%',
-    height: '100%',
-  },
-  heroClip: {
-    width: 128,
-    height: 128,
-    borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: BrandColors.mint,
+    width: 120,
+    height: 120,
   },
   heroLogo: {
-    width: '100%',
-    height: '100%',
+    width: 128,
+    height: 128,
   },
   splashOverlay: {
     ...StyleSheet.absoluteFillObject,
