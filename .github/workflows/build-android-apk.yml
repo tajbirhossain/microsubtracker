@@ -70,27 +70,55 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Tune Gradle memory + skip release lint
+      - name: Tune Gradle for CI
         run: |
-          cat >> android/gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          android.native.buildOutput=quiet
-          EOF
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path("android/gradle.properties")
+          text = path.read_text()
+          lines = [
+              line
+              for line in text.splitlines()
+              if not line.startswith("org.gradle.jvmargs=")
+              and not line.startswith("org.gradle.parallel=")
+              and not line.startswith("org.gradle.caching=")
+          ]
+          lines.extend(
+              [
+                  "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8",
+                  "org.gradle.parallel=true",
+                  "org.gradle.caching=true",
+                  "android.enableJetifier=true",
+              ]
+          )
+          path.write_text("\n".join(lines) + "\n")
+          print(path.read_text())
+          PY
 
       - name: Build release APK
         working-directory: android
+        env:
+          NODE_ENV: production
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew assembleRelease \
             --no-daemon \
             --build-cache \
-            -x lint \
+            --stacktrace \
             -x lintVitalAnalyzeRelease \
             -x lintVitalRelease \
-            -x test \
-            -x testReleaseUnitTest
+            -x testReleaseUnitTest \
+            | tee ../gradle-build.log
+
+      - name: Upload Gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: gradle-build.log
+          if-no-files-found: ignore
 
       - name: Stage APK
         run: |
