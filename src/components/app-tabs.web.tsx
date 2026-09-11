@@ -8,6 +8,7 @@ import {
 } from 'expo-router/ui';
 import { Pressable, View, StyleSheet } from 'react-native';
 
+import { BrandLogo } from './BrandLogo';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -52,9 +53,12 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
-          Micro Sub Tracker
-        </ThemedText>
+        <View style={styles.brandRow}>
+          <BrandLogo size={22} />
+          <ThemedText type="smallBold" style={styles.brandText}>
+            Micro Sub Tracker
+          </ThemedText>
+        </View>
         {props.children}
       </ThemedView>
     </View>
@@ -80,8 +84,14 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
   },
-  brandText: {
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginRight: 'auto',
+  },
+  brandText: {
+    marginRight: 0,
   },
   pressed: {
     opacity: 0.7,

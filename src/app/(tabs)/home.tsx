@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CancelGuideDrawer } from '@/components/actions/CancelGuideDrawer';
 import { TrialCountdownRow } from '@/components/actions/TrialCountdownCard';
+import { BrandLogo } from '@/components/BrandLogo';
 import { BurnRateHero } from '@/components/dashboard/BurnRateHero';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { ScaleBreakdown } from '@/components/dashboard/ScaleBreakdown';
@@ -187,9 +188,12 @@ export default function HomeScreen() {
           />
         }>
         <View style={styles.topBar}>
-          <View>
+          <View style={styles.brandBlock}>
+            <View style={styles.brandTitleRow}>
+              <BrandLogo size={28} />
+              <Text style={styles.brand}>Micro Sub Tracker</Text>
+            </View>
             <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.brand}>Micro Sub Tracker</Text>
           </View>
           <View style={styles.topActions}>
             <Pressable style={styles.addHeaderBtn} onPress={() => setRapidOpen(true)} hitSlop={6}>
@@ -483,9 +487,17 @@ const styles = StyleSheet.create({
     color: DashboardColors.textMuted,
     fontSize: 13,
     fontWeight: '500',
+    marginTop: 6,
+  },
+  brandBlock: {
+    flexShrink: 1,
+  },
+  brandTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   brand: {
-    marginTop: 2,
     color: DashboardColors.text,
     fontSize: 20,
     fontWeight: '700',

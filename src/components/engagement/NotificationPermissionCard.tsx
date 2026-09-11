@@ -6,12 +6,19 @@ import {
   usePreferences,
   type NotificationPermissionStatus,
 } from '@/context/preferences-context';
+import { canUseRemotePushInThisClient } from '@/services/push-notifications';
 
 type Props = {
   compact?: boolean;
 };
 
 function statusCopy(status: NotificationPermissionStatus) {
+  if (!canUseRemotePushInThisClient()) {
+    return {
+      title: 'Push needs a dev build',
+      body: 'Android Expo Go can’t register for remote push (SDK 53+). Use an EAS development or preview build to enable alerts.',
+    };
+  }
   switch (status) {
     case 'granted':
       return {
@@ -38,6 +45,7 @@ export function NotificationPermissionCard({ compact = false }: Props) {
     declineNotificationPermission,
     refreshNotificationPermission,
   } = usePreferences();
+  const pushSupported = canUseRemotePushInThisClient();
   const copy = statusCopy(notificationPermission);
 
   const openSettings = () => {
@@ -46,6 +54,14 @@ export function NotificationPermissionCard({ compact = false }: Props) {
 
   if (compact && notificationPermission === 'granted') {
     return null;
+  }
+
+  if (!pushSupported) {
+    return (
+      <View style={styles.wrap}>
+        <StatePanel tone="warning" title={copy.title} body={copy.body} />
+      </View>
+    );
   }
 
   return (

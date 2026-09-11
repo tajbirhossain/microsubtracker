@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { BrandLogo } from '@/components/BrandLogo';
 import type { PlanTier } from '@/constants/onboarding';
 import { OnboardingColors } from '@/constants/onboarding';
 
@@ -49,6 +50,7 @@ export function PaywallHeroCard({ plan }: HeroProps) {
         <View style={[styles.cardStack, styles.cardBack]} />
         <View style={[styles.cardStack, styles.cardMid]} />
         <View style={[styles.cardStack, styles.cardFront]}>
+          <BrandLogo size={28} />
           <Text style={styles.cardBrand}>Micro Sub Tracker</Text>
           <Text style={styles.cardPlan}>{plan.name}</Text>
         </View>
@@ -199,7 +201,8 @@ const styles = StyleSheet.create({
   cardFront: {
     backgroundColor: 'rgba(255,255,255,0.16)',
     padding: 14,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 6,
   },
   cardBrand: {
     color: 'rgba(255,255,255,0.7)',

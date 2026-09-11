@@ -25,6 +25,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { BrandLogo } from '@/components/BrandLogo';
 import { ProgressSegments } from '@/components/onboarding/ProgressSegments';
 import { BRAND_NAME, OnboardingColors, WELCOME_SLIDES, type WelcomeSlide } from '@/constants/onboarding';
 import { useOnboarding } from '@/context/onboarding-context';
@@ -169,7 +170,7 @@ export default function WelcomeScreen() {
   }));
 
   const brandStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(themeProgress.value, [0, 1], ['#FFFFFF', '#000000']),
+    opacity: interpolate(themeProgress.value, [0, 0.5, 1], [1, 0.92, 1]),
   }));
 
   const createBtnStyle = useAnimatedStyle(() => ({
@@ -204,10 +205,12 @@ export default function WelcomeScreen() {
           activeIndex={index}
           theme={isLight ? 'light' : 'dark'}
         />
-        <Animated.Text style={[styles.brandRow, brandStyle]}>
-          <Text style={styles.brandMark}>◆ </Text>
-          Welcome to {BRAND_NAME}
-        </Animated.Text>
+        <Animated.View style={[styles.brandRow, brandStyle]}>
+          <BrandLogo size={28} />
+          <Text style={[styles.brandText, isLight ? styles.textDark : null]}>
+            Welcome to {BRAND_NAME}
+          </Text>
+        </Animated.View>
       </Animated.View>
 
       <Animated.FlatList
@@ -265,11 +268,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  brandText: {
     fontSize: 15,
     fontWeight: '500',
-  },
-  brandMark: {
-    fontWeight: '700',
+    color: '#FFFFFF',
   },
   textDark: {
     color: '#000000',

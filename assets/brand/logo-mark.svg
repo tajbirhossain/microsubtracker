@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <rect width="1024" height="1024" fill="#7CBBAA"/>
+  <!-- Arrowhead first (under), then shaft ending at the exact L-corner center -->
+  <rect x="590" y="218" width="240" height="100" rx="50" fill="#FFFFFF"/>
+  <rect x="730" y="218" width="100" height="250" rx="50" fill="#FFFFFF"/>
+  <path
+    d="M250 700 L400 510 L520 595 L780 268"
+    stroke="#FFFFFF"
+    stroke-width="100"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

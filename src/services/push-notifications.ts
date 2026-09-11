@@ -1,26 +1,55 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 export type NotificationPermissionStatus = 'unknown' | 'granted' | 'denied';
 
 const PUSH_TOKEN_KEY = 'mst.pushToken';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsNS = typeof import('expo-notifications');
 
-function mapPermissionStatus(
-  status: Notifications.PermissionStatus
-): NotificationPermissionStatus {
+let cachedNotifications: NotificationsNS | null | undefined;
+let handlerReady = false;
+
+/** Android Expo Go (SDK 53+) throws on import — remote push needs a dev/prod build. */
+function isAndroidExpoGo(): boolean {
+  return Constants.appOwnership === 'expo' && Platform.OS === 'android';
+}
+
+function loadNotifications(): NotificationsNS | null {
+  if (isAndroidExpoGo()) {
+    return null;
+  }
+  if (cachedNotifications !== undefined) {
+    return cachedNotifications;
+  }
+  try {
+    // Lazy load so Expo Go Android does not crash at app boot.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    cachedNotifications = require('expo-notifications') as NotificationsNS;
+  } catch (error) {
+    console.warn('expo-notifications unavailable in this client', error);
+    cachedNotifications = null;
+  }
+  return cachedNotifications;
+}
+
+function ensureHandler(Notifications: NotificationsNS): void {
+  if (handlerReady) return;
+  handlerReady = true;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
+function mapPermissionStatus(status: string): NotificationPermissionStatus {
   if (status === 'granted') return 'granted';
   if (status === 'denied') return 'denied';
   return 'unknown';
@@ -34,7 +63,7 @@ export async function clearStoredPushToken(): Promise<void> {
   await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
 }
 
-async function ensureAndroidChannel(): Promise<void> {
+async function ensureAndroidChannel(Notifications: NotificationsNS): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('default', {
     name: 'Micro Sub Tracker',
@@ -51,7 +80,10 @@ function resolveProjectId(): string | undefined {
 }
 
 export async function getOsNotificationPermission(): Promise<NotificationPermissionStatus> {
-  if (Platform.OS === 'web') return 'denied';
+  if (Platform.OS === 'web' || isAndroidExpoGo()) return 'denied';
+  const Notifications = loadNotifications();
+  if (!Notifications) return 'denied';
+  ensureHandler(Notifications);
   const current = await Notifications.getPermissionsAsync();
   return mapPermissionStatus(current.status);
 }
@@ -60,11 +92,17 @@ export async function requestOsNotificationPermission(): Promise<{
   status: NotificationPermissionStatus;
   token: string | null;
 }> {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === 'web' || isAndroidExpoGo()) {
     return { status: 'denied', token: null };
   }
 
-  await ensureAndroidChannel();
+  const Notifications = loadNotifications();
+  if (!Notifications) {
+    return { status: 'denied', token: null };
+  }
+
+  ensureHandler(Notifications);
+  await ensureAndroidChannel(Notifications);
 
   const current = await Notifications.getPermissionsAsync();
   let status = current.status;
@@ -80,7 +118,6 @@ export async function requestOsNotificationPermission(): Promise<{
   }
 
   if (!Device.isDevice) {
-    // Simulator/emulator: permission can be granted but Expo push tokens are unreliable.
     return { status: 'granted', token: null };
   }
 
@@ -98,13 +135,22 @@ export async function requestOsNotificationPermission(): Promise<{
 }
 
 export async function refreshExpoPushToken(): Promise<string | null> {
+  if (isAndroidExpoGo()) {
+    return getStoredPushToken();
+  }
+
   const status = await getOsNotificationPermission();
   if (status !== 'granted' || !Device.isDevice) {
     return getStoredPushToken();
   }
 
+  const Notifications = loadNotifications();
+  if (!Notifications) {
+    return getStoredPushToken();
+  }
+
   try {
-    await ensureAndroidChannel();
+    await ensureAndroidChannel(Notifications);
     const projectId = resolveProjectId();
     const tokenResult = await Notifications.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined
@@ -115,4 +161,8 @@ export async function refreshExpoPushToken(): Promise<string | null> {
     console.warn('Failed to refresh Expo push token', error);
     return getStoredPushToken();
   }
+}
+
+export function canUseRemotePushInThisClient(): boolean {
+  return !isAndroidExpoGo() && Platform.OS !== 'web';
 }

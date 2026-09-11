@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BrandLogo } from '@/components/BrandLogo';
 import { NotificationContentPrefs } from '@/components/engagement/NotificationContentPrefs';
 import { BackButton } from '@/components/onboarding/BackButton';
 import { OnboardingShell } from '@/components/onboarding/OnboardingShell';
@@ -67,9 +68,7 @@ export default function NotificationsScreen() {
       <BackButton />
       <View style={styles.center}>
         <View style={styles.iconCard}>
-          <View style={styles.iconBadge}>
-            <Text style={styles.iconMark}>◆</Text>
-          </View>
+          <BrandLogo size={40} />
         </View>
         <Text style={styles.title}>STAY AHEAD{'\n'}OF CHARGES</Text>
         <Text style={styles.copy}>
@@ -97,29 +96,16 @@ const styles = StyleSheet.create({
   },
   iconCard: {
     width: 88,
-    height: 64,
-    borderRadius: 14,
+    height: 72,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     marginBottom: 28,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: 12,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
-  },
-  iconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: OnboardingColors.link,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconMark: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
   title: {
     color: OnboardingColors.text,
