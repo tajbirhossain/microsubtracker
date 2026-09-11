@@ -15,8 +15,10 @@ type Props = {
 };
 
 export function PreferencesForm({ monthlyTotalUsd }: Props) {
-  const { ratesStatus, currencyCode } = usePreferences();
+  const { ratesStatus, currencyCode, notificationPermission } = usePreferences();
   const { user, signOut, isAuthenticated } = useOnboarding();
+  const needsPermission =
+    notificationPermission === 'unknown' || notificationPermission === 'denied';
 
   return (
     <View style={styles.wrap}>
@@ -38,6 +40,16 @@ export function PreferencesForm({ monthlyTotalUsd }: Props) {
         </>
       ) : null}
 
+      {needsPermission ? (
+        <>
+          <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Notifications</Text>
+          <Text style={styles.sectionHint}>
+            Push alerts are off. Enable them so renewal and trial reminders can reach this device.
+          </Text>
+          <NotificationPermissionCard />
+        </>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Display currency</Text>
       <Text style={styles.sectionHint}>
         Convert your burn rate into the currency you think in. Active: {currencyCode}.
@@ -54,11 +66,15 @@ export function PreferencesForm({ monthlyTotalUsd }: Props) {
         </View>
       ) : null}
 
-      <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Push permission</Text>
-      <Text style={styles.sectionHint}>
-        When the system blocks alerts, open Settings to re-enable them on this device.
-      </Text>
-      <NotificationPermissionCard />
+      {!needsPermission ? (
+        <>
+          <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Push permission</Text>
+          <Text style={styles.sectionHint}>
+            When the system blocks alerts, open Settings to re-enable them on this device.
+          </Text>
+          <NotificationPermissionCard />
+        </>
+      ) : null}
 
       <Text style={[styles.sectionLabel, styles.sectionSpaced]}>Notification content</Text>
       <NotificationContentPrefs />

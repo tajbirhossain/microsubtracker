@@ -3,6 +3,7 @@ import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import { getStoredPushToken } from '@/services/push-notifications';
 import type { AuthTokens, AuthUser, DevicePayload } from '@/types/api';
 
 const KEYS = {
@@ -56,11 +57,12 @@ export async function buildDevicePayload(pushToken?: string): Promise<DevicePayl
   const deviceKey = await getOrCreateDeviceKey();
   const platform =
     Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+  const resolvedToken = pushToken ?? (await getStoredPushToken()) ?? undefined;
 
   return {
     deviceKey,
     platform,
-    ...(pushToken ? { pushToken } : {}),
+    ...(resolvedToken ? { pushToken: resolvedToken } : {}),
     ...(Application.nativeApplicationVersion
       ? { appVersion: Application.nativeApplicationVersion }
       : {}),

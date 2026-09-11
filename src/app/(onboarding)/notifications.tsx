@@ -12,32 +12,56 @@ import { usePreferences } from '@/context/preferences-context';
 
 export default function NotificationsScreen() {
   const { updateDraft } = useOnboarding();
-  const { setNotificationPermission } = usePreferences();
+  const { requestNotificationPermission, declineNotificationPermission } = usePreferences();
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const enable = () => {
-    updateDraft({ notificationsEnabled: true });
-    setNotificationPermission('granted');
-    router.push('/(onboarding)/country');
+  const enable = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const status = await requestNotificationPermission();
+      updateDraft({ notificationsEnabled: status === 'granted' });
+      router.push('/(onboarding)/country');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const skip = () => {
-    updateDraft({ notificationsEnabled: false });
-    setNotificationPermission('denied');
-    router.push('/(onboarding)/country');
+  const skip = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await declineNotificationPermission();
+      updateDraft({ notificationsEnabled: false });
+      router.push('/(onboarding)/country');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <OnboardingShell
       footer={
         <>
-          <PrimaryButton label="Enable push notifications" onPress={enable} />
+          <PrimaryButton
+            label={busy ? 'Working…' : 'Enable push notifications'}
+            onPress={() => {
+              void enable();
+            }}
+          />
           <PrimaryButton
             label={customizeOpen ? 'Hide content options' : 'Choose alert contents'}
             variant="secondary"
             onPress={() => setCustomizeOpen((open) => !open)}
           />
-          <PrimaryButton label="Not now" variant="secondary" onPress={skip} />
+          <PrimaryButton
+            label="Not now"
+            variant="secondary"
+            onPress={() => {
+              void skip();
+            }}
+          />
         </>
       }>
       <BackButton />
@@ -49,8 +73,8 @@ export default function NotificationsScreen() {
         </View>
         <Text style={styles.title}>STAY AHEAD{'\n'}OF CHARGES</Text>
         <Text style={styles.copy}>
-          Customize local push alerts for renewals, trial endings, and unused subscriptions. If you
-          skip, you can still allow them later from Settings.
+          Turn on push alerts for renewals, trial endings, and unused subscriptions. If you skip,
+          you can enable them later from Preferences.
         </Text>
       </View>
 

@@ -259,11 +259,19 @@ export default function HomeScreen() {
               />
             ) : null}
 
-            {notificationPermission === 'denied' ? (
+            {notificationPermission === 'denied' || notificationPermission === 'unknown' ? (
               <StatePanel
                 tone="warning"
-                title="Notifications blocked"
-                body="Renewal and trial alerts can’t reach you until permission is allowed in system Settings."
+                title={
+                  notificationPermission === 'denied'
+                    ? 'Notifications blocked'
+                    : 'Enable notifications'
+                }
+                body={
+                  notificationPermission === 'denied'
+                    ? 'Renewal and trial alerts can’t reach you until permission is allowed in system Settings.'
+                    : 'Turn on push alerts so renewals and trial endings don’t sneak up on you.'
+                }
                 ctaLabel="Open preferences"
                 onCtaPress={() => router.push('/(tabs)/preferences')}
               />

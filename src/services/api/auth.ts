@@ -1,5 +1,12 @@
 import { apiRequest } from '@/services/api/client';
-import { buildDevicePayload, clearSession, getRefreshToken, saveSession } from '@/services/session';
+import { clearStoredPushToken } from '@/services/push-notifications';
+import {
+  buildDevicePayload,
+  clearSession,
+  getOrCreateDeviceKey,
+  getRefreshToken,
+  saveSession,
+} from '@/services/session';
 import type {
   AuthSessionResult,
   AuthUser,
@@ -84,6 +91,16 @@ export async function fetchMe(): Promise<AuthUser> {
 export async function logout(allDevices = false): Promise<void> {
   const refreshToken = await getRefreshToken();
   try {
+    const deviceKey = await getOrCreateDeviceKey();
+    try {
+      await apiRequest('/notifications/push-token', {
+        method: 'PUT',
+        auth: true,
+        body: { deviceKey, pushToken: null },
+      });
+    } catch {
+      // best-effort clear
+    }
     await apiRequest<{ revoked: boolean }>('/auth/logout', {
       method: 'POST',
       auth: allDevices,
@@ -92,6 +109,7 @@ export async function logout(allDevices = false): Promise<void> {
   } catch {
     // still clear local session
   }
+  await clearStoredPushToken();
   await clearSession();
 }
 

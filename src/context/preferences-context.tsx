@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import {
   convertToUsd,
@@ -28,13 +29,23 @@ import { useOnboarding } from '@/context/onboarding-context';
 import {
   getCurrencyRates,
   getNotificationPreferences,
+  registerPushToken,
   updateNotificationPreferences,
 } from '@/services/api';
 import { loadCurrencyRates, saveCurrencyRates } from '@/services/local-store';
+import {
+  clearStoredPushToken,
+  getOsNotificationPermission,
+  getStoredPushToken,
+  requestOsNotificationPermission,
+  refreshExpoPushToken,
+  type NotificationPermissionStatus,
+} from '@/services/push-notifications';
+import { getOrCreateDeviceKey } from '@/services/session';
 import { formatMoney } from '@/utils/subscriptions';
 
 export type RatesStatus = 'live' | 'cached';
-export type NotificationPermissionStatus = 'unknown' | 'granted' | 'denied';
+export type { NotificationPermissionStatus };
 
 type PreferencesContextValue = {
   currencyCode: CurrencyCode;
@@ -47,6 +58,9 @@ type PreferencesContextValue = {
   refreshRates: () => Promise<void>;
   notificationPermission: NotificationPermissionStatus;
   setNotificationPermission: (status: NotificationPermissionStatus) => void;
+  requestNotificationPermission: () => Promise<NotificationPermissionStatus>;
+  refreshNotificationPermission: () => Promise<NotificationPermissionStatus>;
+  declineNotificationPermission: () => Promise<void>;
   notificationContentIds: NotificationContentId[];
   toggleNotificationContent: (id: NotificationContentId) => void;
   setNotificationContentIds: (ids: NotificationContentId[]) => void;
@@ -92,6 +106,89 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     DEFAULT_NOTIFICATION_CONTENT_IDS
   );
   const [dismissedGhostIds, setDismissedGhostIds] = useState<string[]>([]);
+
+  const syncPushTokenWithBackend = useCallback(
+    async (token: string | null) => {
+      if (!isAuthenticated || !isOnline) return;
+      try {
+        const deviceKey = await getOrCreateDeviceKey();
+        await registerPushToken(deviceKey, token);
+      } catch (error) {
+        console.warn('Failed to sync push token', error);
+      }
+    },
+    [isAuthenticated, isOnline]
+  );
+
+  const refreshNotificationPermission = useCallback(async () => {
+    const status = await getOsNotificationPermission();
+    setNotificationPermission(status);
+    if (status === 'granted') {
+      const token = await refreshExpoPushToken();
+      if (token) await syncPushTokenWithBackend(token);
+    }
+    return status;
+  }, [syncPushTokenWithBackend]);
+
+  const requestNotificationPermission = useCallback(async () => {
+    const result = await requestOsNotificationPermission();
+    setNotificationPermission(result.status);
+    if (result.status === 'granted') {
+      await syncPushTokenWithBackend(result.token);
+    } else {
+      await clearStoredPushToken();
+      await syncPushTokenWithBackend(null);
+    }
+    return result.status;
+  }, [syncPushTokenWithBackend]);
+
+  const declineNotificationPermission = useCallback(async () => {
+    setNotificationPermission('denied');
+    await clearStoredPushToken();
+    await syncPushTokenWithBackend(null);
+  }, [syncPushTokenWithBackend]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const status = await getOsNotificationPermission();
+      if (!cancelled) setNotificationPermission(status);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onChange = (next: AppStateStatus) => {
+      if (next === 'active') {
+        void refreshNotificationPermission();
+      }
+    };
+    const sub = AppState.addEventListener('change', onChange);
+    return () => sub.remove();
+  }, [refreshNotificationPermission]);
+
+  useEffect(() => {
+    if (!isAuthReady || !isAuthenticated || !isOnline) return;
+    if (notificationPermission !== 'granted') return;
+
+    let cancelled = false;
+    (async () => {
+      const token = (await getStoredPushToken()) ?? (await refreshExpoPushToken());
+      if (!cancelled && token) await syncPushTokenWithBackend(token);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isAuthReady,
+    isAuthenticated,
+    isOnline,
+    notificationPermission,
+    syncPushTokenWithBackend,
+  ]);
 
   useEffect(() => {
     if (user?.preferredCurrency && isCurrencyCode(user.preferredCurrency)) {
@@ -272,6 +369,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       refreshRates,
       notificationPermission,
       setNotificationPermission,
+      requestNotificationPermission,
+      refreshNotificationPermission,
+      declineNotificationPermission,
       notificationContentIds,
       toggleNotificationContent,
       setNotificationContentIds: setNotificationContentIdsSafe,
@@ -292,6 +392,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       getUsdRate,
       refreshRates,
       notificationPermission,
+      requestNotificationPermission,
+      refreshNotificationPermission,
+      declineNotificationPermission,
       notificationContentIds,
       toggleNotificationContent,
       setNotificationContentIdsSafe,

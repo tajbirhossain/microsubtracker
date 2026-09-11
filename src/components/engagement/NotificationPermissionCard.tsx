@@ -20,33 +20,38 @@ function statusCopy(status: NotificationPermissionStatus) {
       };
     case 'denied':
       return {
-        title: 'Notifications blocked',
-        body: 'Alerts stay off until you allow them in system Settings.',
+        title: 'Enable notifications',
+        body: 'Alerts are off for this device. Turn them on in system Settings, then return here — we’ll sync automatically.',
       };
     default:
       return {
-        title: 'Push alerts not set',
-        body: 'Enable alerts for renewals and trial endings, or leave them off and track from the dashboard.',
+        title: 'Enable push notifications',
+        body: 'Allow alerts for renewals, trial endings, and unused plans. You can change this anytime.',
       };
   }
 }
 
 export function NotificationPermissionCard({ compact = false }: Props) {
-  const { notificationPermission, setNotificationPermission } = usePreferences();
+  const {
+    notificationPermission,
+    requestNotificationPermission,
+    declineNotificationPermission,
+    refreshNotificationPermission,
+  } = usePreferences();
   const copy = statusCopy(notificationPermission);
 
   const openSettings = () => {
     void Linking.openSettings();
   };
 
-  if (compact && notificationPermission !== 'denied') {
+  if (compact && notificationPermission === 'granted') {
     return null;
   }
 
   return (
     <View style={styles.wrap}>
       <StatePanel
-        tone={notificationPermission === 'denied' ? 'warning' : 'neutral'}
+        tone={notificationPermission === 'granted' ? 'neutral' : 'warning'}
         title={copy.title}
         body={copy.body}
         ctaLabel={
@@ -60,14 +65,28 @@ export function NotificationPermissionCard({ compact = false }: Props) {
           notificationPermission === 'denied'
             ? openSettings
             : notificationPermission === 'unknown'
-              ? () => setNotificationPermission('granted')
+              ? () => {
+                  void requestNotificationPermission();
+                }
               : undefined
         }
-        secondaryLabel={notificationPermission === 'unknown' ? 'Not now' : undefined}
+        secondaryLabel={
+          notificationPermission === 'unknown'
+            ? 'Not now'
+            : notificationPermission === 'denied'
+              ? 'I already enabled them'
+              : undefined
+        }
         onSecondaryPress={
           notificationPermission === 'unknown'
-            ? () => setNotificationPermission('denied')
-            : undefined
+            ? () => {
+                void declineNotificationPermission();
+              }
+            : notificationPermission === 'denied'
+              ? () => {
+                  void refreshNotificationPermission();
+                }
+              : undefined
         }
       />
       {notificationPermission === 'granted' ? (
