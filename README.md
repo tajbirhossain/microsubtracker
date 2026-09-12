@@ -1,56 +1,57 @@
-# Welcome to your Expo app 👋
+# MicroSubTracker (Expo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Android-first subscription tracker. Add subs fast, see burn rate, trials, calendar, cancel guides, ghost/unused alerts, currency stuff, local push — basically "stop forgetting what you're paying for every month."
 
-## Get started
+Built with Expo (React Native). Talks to the backend under `../backend`.
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+- Expo ~57 / React Native / Expo Router
+- TypeScript
+- AsyncStorage + Secure Store
+- expo-notifications, netinfo, etc.
+- Hits a Node/Express API (Postgres + Redis on the other side)
 
-2. Start the app
+## Run it
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Backend first helps. From `../backend`:
 
 ```bash
-npm run reset-project
+docker compose up -d
+npm install
+# copy .env.example → .env, set DATABASE_URL / JWT secrets, then:
+npm run migrate
+npm run dev
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+App side:
 
-### Other setup steps
+```bash
+cp .env.example .env
+npm install
+npx expo start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Set `EXPO_PUBLIC_API_URL` in `.env`:
 
-## Learn more
+- real phone on same wifi → `http://<your-pc-lan-ip>:5000/api`
+- android emulator → `http://10.0.2.2:5000/api`
+- simulator / web on this machine → `http://localhost:5000/api`
 
-To learn more about developing your project with Expo, look at the following resources:
+Then open Expo Go / emulator / whatever the terminal offers. Android is the main target.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm run android
+```
 
-## Join the community
+works too if you've got a device/emulator hooked up.
 
-Join our community of developers creating universal apps.
+## Tests
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Honestly the app doesn't have a full Jest suite wired up yet. Lint is what we've got:
+
+```bash
+npm run lint
+```
+
+Backend tests live in `../backend` — `npm test` there. That's where most of the real coverage is (auth, subs, parser, currency, etc.).
