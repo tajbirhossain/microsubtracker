@@ -14,11 +14,14 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://microsubtrackerbackend.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://api.microsubtracker.tajbirhossain.com/api"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.microsubtracker.tajbirhossain.com/api"
+      }
     }
   },
   "submit": {

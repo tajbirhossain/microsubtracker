@@ -34,6 +34,7 @@ npx expo start
 
 Set `EXPO_PUBLIC_API_URL` in `.env`:
 
+- production → `https://api.microsubtracker.tajbirhossain.com/api`
 - real phone on same wifi → `http://<your-pc-lan-ip>:5000/api`
 - android emulator → `http://10.0.2.2:5000/api`
 - simulator / web on this machine → `http://localhost:5000/api`
